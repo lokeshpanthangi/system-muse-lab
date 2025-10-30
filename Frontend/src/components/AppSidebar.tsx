@@ -2,6 +2,7 @@ import { Home, List, TrendingUp, Settings, LogOut } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { mockUser } from "@/data/mockData";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const AppSidebar = () => {
   const navigate = useNavigate();
@@ -63,6 +64,12 @@ export const AppSidebar = () => {
             <p className="text-xs text-muted-foreground truncate">{mockUser.email}</p>
           </div>
         </div>
+        
+        {/* Theme Toggle */}
+        <div className="mt-2">
+          <ThemeToggle />
+        </div>
+        
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-2 px-4 py-2 mt-2 text-sm text-muted-foreground hover:text-foreground transition-smooth"
