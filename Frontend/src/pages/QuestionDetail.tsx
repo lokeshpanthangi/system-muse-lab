@@ -7,10 +7,12 @@ import { Clock, Tag, CheckCircle, Lightbulb, BookOpen, ChevronLeft } from "lucid
 import { getQuestionById } from "@/data/mockData";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useState } from "react";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 export default function QuestionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isCollapsed } = useSidebar();
   const question = getQuestionById(id || "");
 
   const [hintsOpen, setHintsOpen] = useState(false);
@@ -27,7 +29,9 @@ export default function QuestionDetail() {
     return (
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <main className="flex-1 ml-64 p-8">
+        <main className={`flex-1 transition-all duration-300 p-4 md:p-8 ${
+          isCollapsed ? 'md:ml-16' : 'md:ml-64'
+        } ml-0`}>
           <div className="text-center">
             <h1 className="text-2xl font-bold">Question not found</h1>
             <Link to="/">
@@ -42,7 +46,9 @@ export default function QuestionDetail() {
   return (
     <div className="flex min-h-screen w-full">
       <AppSidebar />
-      <main className="flex-1 ml-64">
+      <main className={`flex-1 transition-all duration-300 ${
+        isCollapsed ? 'md:ml-16' : 'md:ml-64'
+      } ml-0`}>
         <div className="max-w-4xl mx-auto p-8 space-y-8">
           {/* Back button */}
           <Link

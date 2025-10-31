@@ -348,7 +348,7 @@ const ExcalidrawCanvas = forwardRef<ExcalidrawCanvasRef, ExcalidrawCanvasProps>(
           renderTopRightUI={() => (
             <div className="flex gap-2 p-2">
               <button
-                className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
                 onClick={addSystemDiagramTemplate}
                 title="Add System Architecture Template"
               >
