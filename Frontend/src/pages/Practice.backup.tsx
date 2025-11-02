@@ -109,7 +109,7 @@ export default function Practice() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Question not found</h1>
-          <Button onClick={() => navigate("/")} className="mt-4">
+          <Button onClick={() => navigate("/dashboard")} className="mt-4">
             Back to Dashboard
           </Button>
         </div>
@@ -497,7 +497,7 @@ export default function Practice() {
             setShowResults(false);
             setElapsedTime(0);
           }}
-          onNextQuestion={() => navigate("/")}
+          onNextQuestion={() => navigate("/dashboard")}
         />
       )}
       

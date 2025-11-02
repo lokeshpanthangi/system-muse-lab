@@ -181,7 +181,7 @@ export default function Results() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Go Back
                   </Button>
-                  <Button onClick={() => navigate("/")}>
+                  <Button onClick={() => navigate("/dashboard")}>
                     <Home className="w-4 h-4 mr-2" />
                     Dashboard
                   </Button>
@@ -367,7 +367,7 @@ export default function Results() {
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Another Problem
                 </Button>
-                <Button onClick={() => navigate("/")} className="flex-1 sm:flex-none">
+                <Button onClick={() => navigate("/dashboard")} className="flex-1 sm:flex-none">
                   <Home className="w-4 h-4 mr-2" />
                   Back to Dashboard
                 </Button>

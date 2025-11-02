@@ -10,7 +10,7 @@ export const AppSidebar = () => {
   const { isCollapsed, toggleSidebar } = useSidebar();
 
   const navItems = [
-    { title: "Dashboard", url: "/", icon: Home },
+    { title: "Dashboard", url: "/dashboard", icon: Home },
     { title: "All Questions", url: "/questions", icon: List },
     { title: "My Progress", url: "/progress", icon: TrendingUp },
     { title: "Settings", url: "/settings", icon: Settings },
@@ -56,7 +56,7 @@ export const AppSidebar = () => {
           <NavLink
             key={item.url}
             to={item.url}
-            end={item.url === "/"}
+            end={item.url === "/dashboard"}
             className={({ isActive }) =>
               cn(
                 "flex items-center rounded-lg text-sm font-medium transition-smooth",

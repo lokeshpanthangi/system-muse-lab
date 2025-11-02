@@ -24,7 +24,7 @@ export default function Auth() {
     const isAuthenticated = localStorage.getItem("isAuthenticated");
     const shouldRemember = localStorage.getItem("rememberMe");
     if (isAuthenticated === "true" && shouldRemember === "true") {
-      navigate("/");
+      navigate("/dashboard");
     }
   }, [navigate]);
 
@@ -87,7 +87,7 @@ export default function Auth() {
         title: "Success!",
         description: isSignUp ? "Account created successfully" : "Welcome back!",
       });
-      navigate("/");
+      navigate("/dashboard");
       setIsLoading(false);
     }, 1000);
   };
