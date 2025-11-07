@@ -46,13 +46,6 @@ export default function Results() {
   const feedbackContent: FeedbackContent | null = location.state?.feedbackContent;
 
   useEffect(() => {
-    // Check authentication
-    const isAuthenticated = localStorage.getItem("isAuthenticated");
-    if (isAuthenticated !== "true") {
-      navigate("/auth");
-      return;
-    }
-
     // Simulate loading
     const timer = setTimeout(() => setIsLoading(false), 500);
     return () => clearTimeout(timer);

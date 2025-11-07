@@ -17,8 +17,7 @@ export const AppSidebar = () => {
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    navigate("/auth");
+    navigate("/");
   };
 
   return (

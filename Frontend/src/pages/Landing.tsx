@@ -12,14 +12,6 @@ const Landing = () => {
   const { isDark, toggleTheme } = useTheme();
 
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem("isAuthenticated");
-    if (isAuthenticated === "true") {
-      navigate('/dashboard');
-    }
-  }, [navigate]);
-
-  // Scroll listener to show navbar background only after scrolling
-  useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       setIsScrolled(scrollTop > 10);

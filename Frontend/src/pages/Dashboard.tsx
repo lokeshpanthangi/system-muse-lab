@@ -32,13 +32,6 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    const isAuthenticated = localStorage.getItem("isAuthenticated");
-    if (isAuthenticated !== "true") {
-      navigate("/auth");
-    }
-  }, [navigate]);
-
   const userAttempts = getAttemptsByUserId(mockUser.id);
   const availableQuestions = mockQuestions.filter(
     (q) => !getAttemptByQuestionId(q.id, mockUser.id)
@@ -84,24 +77,24 @@ export default function Dashboard() {
     if (userLevel < 60) {
       // Beginner - recommend easy questions
       recommended = mockQuestions.filter(q => 
-        q.difficulty === "Easy" && !getAttemptByQuestionId(q.id, mockUser.id)
+        q.difficulty === "easy" && !getAttemptByQuestionId(q.id, mockUser.id)
       ).slice(0, 3);
     } else if (userLevel < 80) {
       // Intermediate - mix of easy and medium
       const easy = mockQuestions.filter(q => 
-        q.difficulty === "Easy" && !getAttemptByQuestionId(q.id, mockUser.id)
+        q.difficulty === "easy" && !getAttemptByQuestionId(q.id, mockUser.id)
       ).slice(0, 1);
       const medium = mockQuestions.filter(q => 
-        q.difficulty === "Medium" && !getAttemptByQuestionId(q.id, mockUser.id)
+        q.difficulty === "medium" && !getAttemptByQuestionId(q.id, mockUser.id)
       ).slice(0, 2);
       recommended = [...easy, ...medium];
     } else {
       // Advanced - medium and hard questions
       const medium = mockQuestions.filter(q => 
-        q.difficulty === "Medium" && !getAttemptByQuestionId(q.id, mockUser.id)
+        q.difficulty === "medium" && !getAttemptByQuestionId(q.id, mockUser.id)
       ).slice(0, 1);
       const hard = mockQuestions.filter(q => 
-        q.difficulty === "Hard" && !getAttemptByQuestionId(q.id, mockUser.id)
+        q.difficulty === "hard" && !getAttemptByQuestionId(q.id, mockUser.id)
       ).slice(0, 2);
       recommended = [...medium, ...hard];
     }
@@ -123,18 +116,18 @@ export default function Dashboard() {
     if (searchTerm) {
       filtered = filtered.filter(q => 
         q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.category.toLowerCase().includes(searchTerm.toLowerCase())
+        q.categories.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
     // Apply difficulty filter
     if (selectedDifficulty !== "all") {
-      filtered = filtered.filter(q => q.difficulty === selectedDifficulty);
+      filtered = filtered.filter(q => q.difficulty === selectedDifficulty.toLowerCase());
     }
 
     // Apply category filter
     if (selectedCategory !== "all") {
-      filtered = filtered.filter(q => q.category === selectedCategory);
+      filtered = filtered.filter(q => q.categories.includes(selectedCategory));
     }
 
     // Apply status filter
@@ -151,7 +144,7 @@ export default function Dashboard() {
 
   const filteredQuestions = getFilteredQuestions();
   const recommendedQuestions = getRecommendedQuestions();
-  const categories = [...new Set(mockQuestions.map(q => q.category))];
+  const categories = [...new Set(mockQuestions.flatMap(q => q.categories))];
 
   // Calculate completion rate
   const completionRate = Math.round((userAttempts.length / mockQuestions.length) * 100);
@@ -251,7 +244,6 @@ export default function Dashboard() {
                          <div className="transform transition-transform duration-200 hover:scale-[1.01]">
                            <QuestionCard
                              question={question}
-                             isAttempted={!!getAttemptByQuestionId(question.id, mockUser.id)}
                              attempt={getAttemptByQuestionId(question.id, mockUser.id)}
                            />
                          </div>
@@ -354,7 +346,6 @@ export default function Dashboard() {
                   <div key={question.id} className="w-full">
                     <QuestionCard
                       question={question}
-                      isAttempted={!!getAttemptByQuestionId(question.id, mockUser.id)}
                       attempt={getAttemptByQuestionId(question.id, mockUser.id)}
                     />
                   </div>

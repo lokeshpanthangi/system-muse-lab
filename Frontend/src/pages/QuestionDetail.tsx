@@ -18,13 +18,6 @@ export default function QuestionDetail() {
   const [hintsOpen, setHintsOpen] = useState(false);
   const [constraintsOpen, setConstraintsOpen] = useState(false);
 
-  useEffect(() => {
-    const isAuthenticated = localStorage.getItem("isAuthenticated");
-    if (isAuthenticated !== "true") {
-      navigate("/auth");
-    }
-  }, [navigate]);
-
   if (!question) {
     return (
       <div className="flex min-h-screen w-full">
