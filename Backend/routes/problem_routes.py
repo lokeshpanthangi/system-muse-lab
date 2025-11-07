@@ -17,33 +17,38 @@ problem_router = APIRouter(prefix="/problems", tags=["Problems"])
 
 # ---------- Pydantic Models ----------
 
-class Requirements(BaseModel):
-    functional_requirements: List[str] = []
-    non_functional_requirements: List[str] = []
-
-
 class ProblemCreate(BaseModel):
-    question: str
+    title: str
     description: str
-    functional_requirements: List[str] = []
-    non_functional_requirements: List[str] = []
-    constraints: dict = {}
+    difficulty: str  # "easy" | "medium" | "hard"
+    categories: List[str] = []
+    estimated_time: str = "30 mins"
+    requirements: List[str] = []
+    constraints: List[str] = []
+    hints: List[str] = []
 
 
 class ProblemUpdate(BaseModel):
-    question: Optional[str] = None
+    title: Optional[str] = None
     description: Optional[str] = None
-    functional_requirements: Optional[List[str]] = None
-    non_functional_requirements: Optional[List[str]] = None
-    constraints: Optional[dict] = None
+    difficulty: Optional[str] = None
+    categories: Optional[List[str]] = None
+    estimated_time: Optional[str] = None
+    requirements: Optional[List[str]] = None
+    constraints: Optional[List[str]] = None
+    hints: Optional[List[str]] = None
 
 
 class ProblemResponse(BaseModel):
     id: str
-    question: str
+    title: str
     description: str
-    requirements: Requirements
-    constraints: dict
+    difficulty: str
+    categories: List[str]
+    estimated_time: str
+    requirements: List[str]
+    constraints: List[str]
+    hints: List[str]
     created_by: str
     created_at: str
     updated_at: str
@@ -75,11 +80,14 @@ async def create_new_problem(
     Create a new problem. Requires authentication.
     """
     problem = await create_problem(
-        question=payload.question,
+        title=payload.title,
         description=payload.description,
-        functional_requirements=payload.functional_requirements,
-        non_functional_requirements=payload.non_functional_requirements,
+        difficulty=payload.difficulty,
+        categories=payload.categories,
+        estimated_time=payload.estimated_time,
+        requirements=payload.requirements,
         constraints=payload.constraints,
+        hints=payload.hints,
         created_by=current_user_email
     )
 
@@ -93,10 +101,14 @@ async def create_new_problem(
         "message": "Problem created successfully",
         "problem": {
             "id": problem["_id"],
-            "question": problem["question"],
+            "title": problem["title"],
             "description": problem["description"],
+            "difficulty": problem["difficulty"],
+            "categories": problem["categories"],
+            "estimated_time": problem["estimated_time"],
             "requirements": problem["requirements"],
             "constraints": problem["constraints"],
+            "hints": problem["hints"],
             "created_by": problem["created_by"],
             "created_at": problem["created_at"].isoformat(),
             "updated_at": problem["updated_at"].isoformat()
@@ -119,10 +131,14 @@ async def get_problem(problem_id: str):
 
     return {
         "id": problem["_id"],
-        "question": problem["question"],
+        "title": problem["title"],
         "description": problem["description"],
+        "difficulty": problem["difficulty"],
+        "categories": problem["categories"],
+        "estimated_time": problem["estimated_time"],
         "requirements": problem["requirements"],
         "constraints": problem["constraints"],
+        "hints": problem.get("hints", []),
         "created_by": problem.get("created_by", "Unknown"),
         "created_at": problem["created_at"].isoformat(),
         "updated_at": problem["updated_at"].isoformat()
@@ -146,10 +162,14 @@ async def list_problems(
         "problems": [
             {
                 "id": problem["_id"],
-                "question": problem["question"],
+                "title": problem["title"],
                 "description": problem["description"],
+                "difficulty": problem["difficulty"],
+                "categories": problem["categories"],
+                "estimated_time": problem["estimated_time"],
                 "requirements": problem["requirements"],
                 "constraints": problem["constraints"],
+                "hints": problem.get("hints", []),
                 "created_by": problem.get("created_by", "Unknown"),
                 "created_at": problem["created_at"].isoformat(),
                 "updated_at": problem["updated_at"].isoformat()
@@ -177,10 +197,14 @@ async def get_my_problems(
         "problems": [
             {
                 "id": problem["_id"],
-                "question": problem["question"],
+                "title": problem["title"],
                 "description": problem["description"],
+                "difficulty": problem["difficulty"],
+                "categories": problem["categories"],
+                "estimated_time": problem["estimated_time"],
                 "requirements": problem["requirements"],
                 "constraints": problem["constraints"],
+                "hints": problem.get("hints", []),
                 "created_by": problem.get("created_by"),
                 "created_at": problem["created_at"].isoformat(),
                 "updated_at": problem["updated_at"].isoformat()
@@ -201,11 +225,14 @@ async def update_existing_problem(
     """
     updated_problem = await update_problem(
         problem_id=problem_id,
-        question=payload.question,
+        title=payload.title,
         description=payload.description,
-        functional_requirements=payload.functional_requirements,
-        non_functional_requirements=payload.non_functional_requirements,
+        difficulty=payload.difficulty,
+        categories=payload.categories,
+        estimated_time=payload.estimated_time,
+        requirements=payload.requirements,
         constraints=payload.constraints,
+        hints=payload.hints,
         user_email=current_user_email
     )
 
@@ -225,10 +252,14 @@ async def update_existing_problem(
         "message": "Problem updated successfully",
         "problem": {
             "id": updated_problem["_id"],
-            "question": updated_problem["question"],
+            "title": updated_problem["title"],
             "description": updated_problem["description"],
+            "difficulty": updated_problem["difficulty"],
+            "categories": updated_problem["categories"],
+            "estimated_time": updated_problem["estimated_time"],
             "requirements": updated_problem["requirements"],
             "constraints": updated_problem["constraints"],
+            "hints": updated_problem.get("hints", []),
             "created_by": updated_problem["created_by"],
             "created_at": updated_problem["created_at"].isoformat(),
             "updated_at": updated_problem["updated_at"].isoformat()
@@ -262,7 +293,7 @@ async def search_for_problems(
     limit: int = Query(100, ge=1, le=100)
 ):
     """
-    Search problems by question or description.
+    Search problems by title or description.
     """
     problems = await search_problems(q, skip=skip, limit=limit)
     
@@ -274,10 +305,14 @@ async def search_for_problems(
         "problems": [
             {
                 "id": problem["_id"],
-                "question": problem["question"],
+                "title": problem["title"],
                 "description": problem["description"],
+                "difficulty": problem["difficulty"],
+                "categories": problem["categories"],
+                "estimated_time": problem["estimated_time"],
                 "requirements": problem["requirements"],
                 "constraints": problem["constraints"],
+                "hints": problem.get("hints", []),
                 "created_by": problem.get("created_by", "Unknown"),
                 "created_at": problem["created_at"].isoformat(),
                 "updated_at": problem["updated_at"].isoformat()

@@ -5,24 +5,28 @@ from database import db
 
 
 async def create_problem(
-    question: str,
+    title: str,
     description: str,
-    functional_requirements: List[str],
-    non_functional_requirements: List[str],
-    constraints: dict,
+    difficulty: str,
+    categories: List[str],
+    estimated_time: str,
+    requirements: List[str],
+    constraints: List[str],
+    hints: List[str],
     created_by: str  # user email
 ) -> Optional[dict]:
     """
     Create a new problem in the database.
     """
     problem = {
-        "question": question,
+        "title": title,
         "description": description,
-        "requirements": {
-            "functional_requirements": functional_requirements,
-            "non_functional_requirements": non_functional_requirements
-        },
+        "difficulty": difficulty,
+        "categories": categories,
+        "estimated_time": estimated_time,
+        "requirements": requirements,
         "constraints": constraints,
+        "hints": hints,
         "created_by": created_by,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow()
@@ -76,11 +80,14 @@ async def get_problems_by_user(user_email: str, skip: int = 0, limit: int = 100)
 
 async def update_problem(
     problem_id: str,
-    question: Optional[str] = None,
+    title: Optional[str] = None,
     description: Optional[str] = None,
-    functional_requirements: Optional[List[str]] = None,
-    non_functional_requirements: Optional[List[str]] = None,
-    constraints: Optional[dict] = None,
+    difficulty: Optional[str] = None,
+    categories: Optional[List[str]] = None,
+    estimated_time: Optional[str] = None,
+    requirements: Optional[List[str]] = None,
+    constraints: Optional[List[str]] = None,
+    hints: Optional[List[str]] = None,
     user_email: str = None
 ) -> Optional[dict]:
     """
@@ -99,19 +106,22 @@ async def update_problem(
 
     update_data = {"updated_at": datetime.utcnow()}
     
-    if question is not None:
-        update_data["question"] = question
+    if title is not None:
+        update_data["title"] = title
     if description is not None:
         update_data["description"] = description
-    if functional_requirements is not None or non_functional_requirements is not None:
-        requirements = existing_problem.get("requirements", {})
-        if functional_requirements is not None:
-            requirements["functional_requirements"] = functional_requirements
-        if non_functional_requirements is not None:
-            requirements["non_functional_requirements"] = non_functional_requirements
+    if difficulty is not None:
+        update_data["difficulty"] = difficulty
+    if categories is not None:
+        update_data["categories"] = categories
+    if estimated_time is not None:
+        update_data["estimated_time"] = estimated_time
+    if requirements is not None:
         update_data["requirements"] = requirements
     if constraints is not None:
         update_data["constraints"] = constraints
+    if hints is not None:
+        update_data["hints"] = hints
 
     result = await db.problems.update_one(
         {"_id": ObjectId(problem_id)},
@@ -146,11 +156,11 @@ async def delete_problem(problem_id: str, user_email: str) -> bool:
 
 async def search_problems(query: str, skip: int = 0, limit: int = 100) -> List[dict]:
     """
-    Search problems by question or description.
+    Search problems by title or description.
     """
     search_filter = {
         "$or": [
-            {"question": {"$regex": query, "$options": "i"}},
+            {"title": {"$regex": query, "$options": "i"}},
             {"description": {"$regex": query, "$options": "i"}}
         ]
     }

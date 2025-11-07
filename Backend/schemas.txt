@@ -1,25 +1,51 @@
 users--
-
-id : 
-First Name : 
-Last Name :
-Email : 
-Password : 
+{
+  _id: ObjectId,
+  first_name: string,
+  last_name: string,
+  email: string,              // unique
+  password_hash: string,
+  created_at: datetime,
+  updated_at: datetime
+}
 
 problems--
-
-id : 
-question : 
-description : 
-Requirements : 
-{Functional Requirements:[],
-Non-Functional Requirements:[]}
-Constraints : {}
+{
+  _id: ObjectId,
+  title: string,
+  description: string,
+  difficulty: string,         // "easy" | "medium" | "hard"
+  categories: [string],       // ["Web Services", "Databases"]
+  estimated_time: string,     // "45 mins"
+  requirements: [string],     // Array of requirement strings
+  constraints: [string],      // Array of constraint strings
+  hints: [string],            // Array of hint strings
+  created_by: string,         // user email
+  created_at: datetime,
+  updated_at: datetime
+}
 
 submissions--
-
-id:
-userid:
-problemid:
-diagramcode:
-aichat:[{},{},{}]
+{
+  _id: ObjectId,
+  user_id: string,            // reference to users
+  problem_id: string,         // reference to problems
+  diagram_data: object,       // Excalidraw JSON
+  score: number,              // 0-100
+  time_spent: number,         // seconds
+  status: string,             // "completed" | "in-progress"
+  feedback: {
+    strengths: [string],
+    improvements: [string],
+    missing_components: [string]
+  },
+  chat_messages: [
+    {
+      role: string,           // "user" | "assistant"
+      content: string,
+      timestamp: datetime
+    }
+  ],
+  submitted_at: datetime,
+  updated_at: datetime
+}
