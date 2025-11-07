@@ -1,0 +1,25 @@
+users--
+
+id : 
+First Name : 
+Last Name :
+Email : 
+Password : 
+
+problems--
+
+id : 
+question : 
+description : 
+Requirements : 
+{Functional Requirements:[],
+Non-Functional Requirements:[]}
+Constraints : {}
+
+submissions--
+
+id:
+userid:
+problemid:
+diagramcode:
+aichat:[{},{},{}]
