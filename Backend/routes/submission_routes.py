@@ -11,6 +11,7 @@ from CRUD.submission_crud import (
     add_chat_message,
     delete_submission
 )
+from CRUD.session_crud import get_session_by_id, mark_session_submitted
 from auth import verify_access_token
 
 submission_router = APIRouter(prefix="/submissions", tags=["Submissions"])
@@ -115,6 +116,94 @@ async def create_new_submission(
             "chat_messages": submission["chat_messages"],
             "submitted_at": submission["submitted_at"].isoformat(),
             "updated_at": submission["updated_at"].isoformat()
+        }
+    }
+
+
+@submission_router.post("/from-session/{session_id}", status_code=status.HTTP_201_CREATED)
+async def create_submission_from_session(
+    session_id: str,
+    current_user_email: str = Depends(get_current_user_email)
+):
+    """
+    Convert a practice session to a final submission for evaluation.
+    
+    - Fetches session data
+    - Creates submission with session's diagram_data, time_spent, and chat_messages
+    - Marks session as 'submitted'
+    - Returns the created submission for AI evaluation
+    """
+    # Get the session
+    session = await get_session_by_id(session_id)
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    # Verify ownership
+    if session["user_id"] != current_user_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to submit this session"
+        )
+    
+    # Check if session is already submitted
+    if session["status"] == "submitted":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session already submitted"
+        )
+    
+    # Create submission from session data
+    submission = await create_submission(
+        user_id=session["user_id"],
+        problem_id=session["problem_id"],
+        diagram_data=session.get("diagram_data", {}),
+        status="completed"
+    )
+    
+    if not submission:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create submission"
+        )
+    
+    # Copy session data to submission
+    from datetime import datetime
+    from database import db
+    submissions_collection = db.get_collection("submissions")
+    
+    await submissions_collection.update_one(
+        {"_id": submission["_id"]},
+        {"$set": {
+            "time_spent": session.get("time_spent", 0),
+            "chat_messages": session.get("chat_messages", []),
+            "updated_at": datetime.utcnow()
+        }}
+    )
+    
+    # Mark session as submitted
+    await mark_session_submitted(session_id, current_user_email)
+    
+    # Fetch updated submission
+    updated_submission = await get_submission_by_id(str(submission["_id"]))
+    
+    return {
+        "message": "Submission created from session successfully",
+        "submission": {
+            "id": str(updated_submission["_id"]),
+            "user_id": updated_submission["user_id"],
+            "problem_id": updated_submission["problem_id"],
+            "diagram_data": updated_submission["diagram_data"],
+            "score": updated_submission["score"],
+            "time_spent": updated_submission["time_spent"],
+            "status": updated_submission["status"],
+            "feedback": updated_submission["feedback"],
+            "chat_messages": updated_submission["chat_messages"],
+            "submitted_at": updated_submission["submitted_at"].isoformat(),
+            "updated_at": updated_submission["updated_at"].isoformat()
         }
     }
 

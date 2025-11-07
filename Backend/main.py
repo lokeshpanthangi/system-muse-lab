@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.user_routes import user_router
 from routes.problem_routes import problem_router
 from routes.submission_routes import submission_router
+from routes.session_routes import router as session_router
 
 
 app = FastAPI(title="SystemDesign-io API", version="1.0.3")
@@ -21,6 +22,7 @@ app.add_middleware(
 app.include_router(user_router)
 app.include_router(problem_router)
 app.include_router(submission_router)
+app.include_router(session_router)
 
 
 

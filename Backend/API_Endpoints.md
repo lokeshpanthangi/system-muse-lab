@@ -24,6 +24,7 @@ Authorization: Bearer <access_token>
 1. [Users API](#users-api)
 2. [Problems API](#problems-api)
 3. [Submissions API](#submissions-api)
+4. [Sessions API](#sessions-api)
 
 ---
 
@@ -481,7 +482,7 @@ GET /problems/search/query?q=url+shortener&skip=0&limit=10
 ## 📤 Submissions API
 
 ### 1. Create Submission
-Create a new submission for a problem.
+Create a new submission for a problem (manual creation).
 
 **Endpoint:** `POST /submissions/`
 
@@ -535,9 +536,89 @@ Authorization: Bearer <access_token>
 - `401 Unauthorized` - Invalid or missing token
 - `500 Internal Server Error` - Failed to create submission
 
+**Note:** For practice sessions with auto-save, use `POST /submissions/from-session/{session_id}` instead.
+
 ---
 
-### 2. Get Submission by ID
+### 2. Create Submission from Session
+Convert a practice session to a final submission for evaluation.
+
+**Endpoint:** `POST /submissions/from-session/{session_id}`
+
+**Authentication:** Required 🔒
+
+**Request Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Request Body:** None
+
+**Response:** `201 Created`
+```json
+{
+  "message": "Submission created from session successfully",
+  "submission": {
+    "id": "507f1f77bcf86cd799439013",
+    "user_id": "john.doe@example.com",
+    "problem_id": "507f1f77bcf86cd799439011",
+    "diagram_data": {
+      "elements": [
+        {
+          "type": "rectangle",
+          "x": 100,
+          "y": 100,
+          "width": 200,
+          "height": 100
+        }
+      ],
+      "appState": {
+        "viewBackgroundColor": "#ffffff"
+      }
+    },
+    "score": 0,
+    "time_spent": 1200,
+    "status": "completed",
+    "feedback": {
+      "strengths": [],
+      "improvements": [],
+      "missing_components": []
+    },
+    "chat_messages": [
+      {
+        "role": "user",
+        "content": "How should I handle caching?",
+        "timestamp": "2024-01-15T10:35:00.000Z"
+      },
+      {
+        "role": "assistant",
+        "content": "Consider using Redis...",
+        "timestamp": "2024-01-15T10:35:05.000Z"
+      }
+    ],
+    "submitted_at": "2024-01-15T10:50:00",
+    "updated_at": "2024-01-15T10:50:00"
+  }
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` - Session already submitted
+- `401 Unauthorized` - Invalid or missing token
+- `403 Forbidden` - Session belongs to another user
+- `404 Not Found` - Session not found
+- `500 Internal Server Error` - Failed to create submission
+
+**Workflow:**
+1. Fetches session data (diagram_data, time_spent, chat_messages)
+2. Creates submission with status "completed"
+3. Copies chat messages from session
+4. Marks session as "submitted"
+5. Returns submission ready for AI evaluation
+
+---
+
+### 3. Get Submission by ID
 Retrieve a specific submission. User can only access their own submissions.
 
 **Endpoint:** `GET /submissions/{submission_id}`
@@ -859,7 +940,392 @@ Authorization: Bearer <access_token>
 
 ---
 
-## 📝 Notes
+## � Sessions API
+
+Practice sessions track user's active work on a problem with auto-save functionality.
+
+### 1. Create Session (or Resume Existing)
+Start a new practice session or return existing active session for a problem.
+
+**Endpoint:** `POST /sessions/`
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "problem_id": "507f1f77bcf86cd799439011"
+}
+```
+
+**Response:** `201 Created` (or `200 OK` if resuming existing)
+```json
+{
+  "id": "507f1f77bcf86cd799439012",
+  "user_id": "user@example.com",
+  "problem_id": "507f1f77bcf86cd799439011",
+  "diagram_data": {},
+  "diagram_hash": "d41d8cd98f00b204e9800998ecf8427e",
+  "time_spent": 0,
+  "status": "active",
+  "chat_messages": [],
+  "last_saved_at": "2024-01-15T10:30:00.000Z",
+  "started_at": "2024-01-15T10:30:00.000Z",
+  "ended_at": null,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "updated_at": "2024-01-15T10:30:00.000Z"
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized` - Missing or invalid token
+
+**Notes:**
+- Auto-resume: If user has an active/paused session for this problem, returns that session instead of creating new one
+- Only one active session per problem per user
+
+---
+
+### 2. Get Session by ID
+Retrieve a specific practice session.
+
+**Endpoint:** `GET /sessions/{session_id}`
+
+**Authentication:** Required
+
+**Response:** `200 OK`
+```json
+{
+  "id": "507f1f77bcf86cd799439012",
+  "user_id": "user@example.com",
+  "problem_id": "507f1f77bcf86cd799439011",
+  "diagram_data": {
+    "elements": [],
+    "appState": {}
+  },
+  "diagram_hash": "a1b2c3d4e5f6...",
+  "time_spent": 1200,
+  "status": "active",
+  "chat_messages": [
+    {
+      "role": "user",
+      "content": "How should I handle caching?",
+      "timestamp": "2024-01-15T10:35:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Consider using Redis for caching...",
+      "timestamp": "2024-01-15T10:35:05.000Z"
+    }
+  ],
+  "last_saved_at": "2024-01-15T10:50:00.000Z",
+  "started_at": "2024-01-15T10:30:00.000Z",
+  "ended_at": null,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "updated_at": "2024-01-15T10:50:00.000Z"
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized` - Missing or invalid token
+- `403 Forbidden` - Session belongs to another user
+- `404 Not Found` - Session not found
+
+---
+
+### 3. Get Active Session for Problem
+Get user's active or paused session for a specific problem.
+
+**Endpoint:** `GET /sessions/problem/{problem_id}`
+
+**Authentication:** Required
+
+**Response:** `200 OK` (or `null` if no active session)
+```json
+{
+  "id": "507f1f77bcf86cd799439012",
+  "user_id": "user@example.com",
+  "problem_id": "507f1f77bcf86cd799439011",
+  "diagram_data": {},
+  "diagram_hash": "d41d8cd98f00b204e9800998ecf8427e",
+  "time_spent": 300,
+  "status": "active",
+  "chat_messages": [],
+  "last_saved_at": "2024-01-15T10:35:00.000Z",
+  "started_at": "2024-01-15T10:30:00.000Z",
+  "ended_at": null,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "updated_at": "2024-01-15T10:35:00.000Z"
+}
+```
+
+**Notes:**
+- Use this before starting practice to check if session already exists
+- Returns `null` if no active/paused session found
+
+---
+
+### 4. Auto-save Session
+Save session progress (called every 10 seconds from frontend).
+
+**Endpoint:** `PUT /sessions/{session_id}/autosave`
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "diagram_data": {
+    "elements": [
+      {
+        "type": "rectangle",
+        "x": 100,
+        "y": 100,
+        "width": 200,
+        "height": 100
+      }
+    ],
+    "appState": {
+      "viewBackgroundColor": "#ffffff"
+    }
+  },
+  "time_spent": 120
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "507f1f77bcf86cd799439012",
+  "user_id": "user@example.com",
+  "problem_id": "507f1f77bcf86cd799439011",
+  "diagram_data": {
+    "elements": [...],
+    "appState": {...}
+  },
+  "diagram_hash": "new_hash_value",
+  "time_spent": 120,
+  "status": "active",
+  "chat_messages": [],
+  "last_saved_at": "2024-01-15T10:32:00.000Z",
+  "started_at": "2024-01-15T10:30:00.000Z",
+  "ended_at": null,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "updated_at": "2024-01-15T10:32:00.000Z"
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized` - Missing or invalid token
+- `404 Not Found` - Session not found or access denied
+
+**Notes:**
+- Only saves if diagram data changed (hash comparison)
+- Always updates time_spent and last_saved_at
+- Prevents unnecessary database writes
+
+---
+
+### 5. Pause Session
+Pause a session when user navigates away.
+
+**Endpoint:** `PUT /sessions/{session_id}/pause`
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "time_spent": 600
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "507f1f77bcf86cd799439012",
+  "user_id": "user@example.com",
+  "problem_id": "507f1f77bcf86cd799439011",
+  "diagram_data": {...},
+  "diagram_hash": "a1b2c3d4...",
+  "time_spent": 600,
+  "status": "paused",
+  "chat_messages": [],
+  "last_saved_at": "2024-01-15T10:40:00.000Z",
+  "started_at": "2024-01-15T10:30:00.000Z",
+  "ended_at": null,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "updated_at": "2024-01-15T10:40:00.000Z"
+}
+```
+
+---
+
+### 6. Resume Session
+Resume a paused session.
+
+**Endpoint:** `PUT /sessions/{session_id}/resume`
+
+**Authentication:** Required
+
+**Request Body:** None
+
+**Response:** `200 OK`
+```json
+{
+  "id": "507f1f77bcf86cd799439012",
+  "user_id": "user@example.com",
+  "problem_id": "507f1f77bcf86cd799439011",
+  "diagram_data": {...},
+  "diagram_hash": "a1b2c3d4...",
+  "time_spent": 600,
+  "status": "active",
+  "chat_messages": [],
+  "last_saved_at": "2024-01-15T10:40:00.000Z",
+  "started_at": "2024-01-15T10:30:00.000Z",
+  "ended_at": null,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "updated_at": "2024-01-15T10:45:00.000Z"
+}
+```
+
+---
+
+### 7. Add Chat Message to Session
+Add AI chat message during practice.
+
+**Endpoint:** `POST /sessions/{session_id}/chat`
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "role": "user",
+  "content": "How should I implement load balancing?"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "507f1f77bcf86cd799439012",
+  "user_id": "user@example.com",
+  "problem_id": "507f1f77bcf86cd799439011",
+  "diagram_data": {...},
+  "diagram_hash": "a1b2c3d4...",
+  "time_spent": 300,
+  "status": "active",
+  "chat_messages": [
+    {
+      "role": "user",
+      "content": "How should I implement load balancing?",
+      "timestamp": "2024-01-15T10:35:00.000Z"
+    }
+  ],
+  "last_saved_at": "2024-01-15T10:32:00.000Z",
+  "started_at": "2024-01-15T10:30:00.000Z",
+  "ended_at": null,
+  "created_at": "2024-01-15T10:30:00.000Z",
+  "updated_at": "2024-01-15T10:35:00.000Z"
+}
+```
+
+**Notes:**
+- Chat messages stored in session during practice
+- Copied to submission when user submits for evaluation
+
+---
+
+### 8. Abandon Session
+Mark session as abandoned (user wants to start fresh).
+
+**Endpoint:** `DELETE /sessions/{session_id}`
+
+**Authentication:** Required
+
+**Request Body:** None
+
+**Response:** `204 No Content`
+
+**Error Responses:**
+- `401 Unauthorized` - Missing or invalid token
+- `404 Not Found` - Session not found or access denied
+
+**Notes:**
+- Session is marked as "abandoned", not deleted (for analytics)
+- User can create new session for same problem after abandoning
+
+---
+
+### 9. Get My Sessions
+Get all sessions for the current user.
+
+**Endpoint:** `GET /sessions/user/my-sessions`
+
+**Authentication:** Required
+
+**Query Parameters:**
+- `skip` (optional): Number of sessions to skip (default: 0)
+- `limit` (optional): Maximum sessions to return (default: 100)
+
+**Response:** `200 OK`
+```json
+[
+  {
+    "id": "507f1f77bcf86cd799439012",
+    "user_id": "user@example.com",
+    "problem_id": "507f1f77bcf86cd799439011",
+    "diagram_data": {...},
+    "diagram_hash": "a1b2c3d4...",
+    "time_spent": 1200,
+    "status": "submitted",
+    "chat_messages": [...],
+    "last_saved_at": "2024-01-15T10:50:00.000Z",
+    "started_at": "2024-01-15T10:30:00.000Z",
+    "ended_at": "2024-01-15T10:50:00.000Z",
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "updated_at": "2024-01-15T10:50:00.000Z"
+  }
+]
+```
+
+---
+
+### Session Status Values
+- `active` - Currently being worked on
+- `paused` - User navigated away, can resume
+- `submitted` - Converted to submission for evaluation
+- `abandoned` - User chose to start fresh
+
+---
+
+### Session Workflow Example
+
+```
+1. User clicks "Start Practice"
+   → POST /sessions/ (creates or returns existing session)
+
+2. Every 10 seconds while practicing
+   → PUT /sessions/{id}/autosave (saves progress)
+
+3. User asks AI for help
+   → POST /sessions/{id}/chat (adds message)
+
+4. User navigates away
+   → PUT /sessions/{id}/pause
+
+5. User returns
+   → PUT /sessions/{id}/resume
+
+6. User submits solution
+   → POST /submissions/from-session/{session_id}
+   (Session marked as "submitted", creates Submission)
+```
+
+---
+
+## �📝 Notes
 
 1. All timestamps are in ISO 8601 format (UTC)
 2. All IDs are MongoDB ObjectId strings

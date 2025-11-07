@@ -49,3 +49,27 @@ submissions--
   submitted_at: datetime,
   updated_at: datetime
 }
+
+sessions--
+{
+  _id: ObjectId,
+  user_id: string,            // reference to users
+  problem_id: string,         // reference to problems
+  diagram_data: object,       // Excalidraw JSON (auto-saved)
+  diagram_hash: string,       // Hash of diagram_data for change detection
+  time_spent: number,         // seconds spent in session
+  status: string,             // "active" | "paused" | "submitted" | "abandoned"
+  chat_messages: [
+    {
+      role: string,           // "user" | "assistant"
+      content: string,
+      timestamp: datetime
+    }
+  ],
+  last_saved_at: datetime,    // Last auto-save timestamp
+  started_at: datetime,       // Session start time
+  ended_at: datetime,         // When submitted/abandoned (null if active)
+  created_at: datetime,
+  updated_at: datetime
+}
+
