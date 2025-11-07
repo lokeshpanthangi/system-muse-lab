@@ -1,13 +1,29 @@
 import { Home, List, TrendingUp, Settings, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { mockUser } from "@/data/mockData";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { authService } from "@/services/authService";
+import { useEffect, useState } from "react";
+import type { User } from "@/types/api";
 
 export const AppSidebar = () => {
   const navigate = useNavigate();
   const { isCollapsed, toggleSidebar } = useSidebar();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Load user from localStorage or fetch from API
+    const storedUser = authService.getStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
+    } else {
+      // Fetch current user
+      authService.getCurrentUser()
+        .then(setUser)
+        .catch(console.error);
+    }
+  }, []);
 
   const navItems = [
     { title: "Dashboard", url: "/dashboard", icon: Home },
@@ -17,6 +33,7 @@ export const AppSidebar = () => {
   ];
 
   const handleLogout = () => {
+    authService.logout();
     navigate("/");
   };
 
@@ -75,24 +92,24 @@ export const AppSidebar = () => {
 
       {/* User Profile */}
       <div className="p-4 border-t border-sidebar-border">
-        <div className={cn(
-          "flex items-center rounded-lg bg-sidebar-accent",
-          isCollapsed ? "justify-center p-2" : "gap-3 p-3"
-        )}>
-          <img
-            src={mockUser.avatar}
-            alt={mockUser.name}
-            className="w-10 h-10 rounded-full flex-shrink-0"
-          />
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {mockUser.name}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">{mockUser.email}</p>
+        {user && (
+          <div className={cn(
+            "flex items-center rounded-lg bg-sidebar-accent",
+            isCollapsed ? "justify-center p-2" : "gap-3 p-3"
+          )}>
+            <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0 text-white font-semibold">
+              {user.first_name[0]}{user.last_name[0]}
             </div>
-          )}
-        </div>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {user.first_name} {user.last_name}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Theme Toggle */}
         {!isCollapsed && (

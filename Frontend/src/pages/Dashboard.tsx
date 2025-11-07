@@ -13,13 +13,23 @@ import {
   CheckCircle,
   Star
 } from "lucide-react";
-import { mockUser, mockQuestions, getAttemptsByUserId, getAttemptByQuestionId } from "@/data/mockData";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { problemService } from "@/services/problemService";
+import { submissionService } from "@/services/submissionService";
+import { authService } from "@/services/authService";
+import type { Problem, Submission, User } from "@/types/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isCollapsed } = useSidebar();
+  const { toast } = useToast();
+  
   const [isLoading, setIsLoading] = useState(true);
+  const [problems, setProblems] = useState<Problem[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -27,15 +37,45 @@ export default function Dashboard() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    loadData();
   }, []);
 
-  const userAttempts = getAttemptsByUserId(mockUser.id);
-  const availableQuestions = mockQuestions.filter(
-    (q) => !getAttemptByQuestionId(q.id, mockUser.id)
-  );
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch user
+      const storedUser = authService.getStoredUser();
+      if (storedUser) {
+        setUser(storedUser);
+      }
+
+      // Fetch all problems
+      const problemsResponse = await problemService.getAllProblems(0, 100);
+      setProblems(problemsResponse.problems);
+
+      // Fetch user submissions
+      try {
+        const submissionsResponse = await submissionService.getMySubmissions(0, 100);
+        setSubmissions(submissionsResponse.submissions);
+      } catch (error) {
+        console.error('Error fetching submissions:', error);
+        setSubmissions([]);
+      }
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to load data',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getAttemptByProblemId = (problemId: string): Submission | undefined => {
+    return submissions.find(sub => sub.problem_id === problemId);
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -56,63 +96,51 @@ export default function Dashboard() {
       "Every great system starts with a great design"
     ];
     
-    // Use a combination of date and user ID to ensure consistency per day but variety over time
     const today = new Date().toDateString();
-    const seed = today + mockUser.id;
+    const seed = today + (user?.id || '');
     let hash = 0;
     for (let i = 0; i < seed.length; i++) {
       const char = seed.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = hash & hash;
     }
     const index = Math.abs(hash) % slogans.length;
     return slogans[index];
   };
 
-  // Get recommended questions based on user's progress
-  const getRecommendedQuestions = () => {
-    const userLevel = mockUser.stats.averageScore;
-    let recommended = [];
+  const getRecommendedQuestions = (): Problem[] => {
+    const averageScore = submissions.length > 0
+      ? submissions.reduce((sum, sub) => sum + sub.score, 0) / submissions.length
+      : 0;
 
-    if (userLevel < 60) {
-      // Beginner - recommend easy questions
-      recommended = mockQuestions.filter(q => 
-        q.difficulty === "easy" && !getAttemptByQuestionId(q.id, mockUser.id)
-      ).slice(0, 3);
-    } else if (userLevel < 80) {
-      // Intermediate - mix of easy and medium
-      const easy = mockQuestions.filter(q => 
-        q.difficulty === "easy" && !getAttemptByQuestionId(q.id, mockUser.id)
-      ).slice(0, 1);
-      const medium = mockQuestions.filter(q => 
-        q.difficulty === "medium" && !getAttemptByQuestionId(q.id, mockUser.id)
-      ).slice(0, 2);
+    const attemptedProblemIds = new Set(submissions.map(sub => sub.problem_id));
+    const availableProblems = problems.filter(p => !attemptedProblemIds.has(p.id));
+
+    let recommended: Problem[] = [];
+
+    if (averageScore < 60) {
+      recommended = availableProblems.filter(q => q.difficulty === "easy").slice(0, 3);
+    } else if (averageScore < 80) {
+      const easy = availableProblems.filter(q => q.difficulty === "easy").slice(0, 1);
+      const medium = availableProblems.filter(q => q.difficulty === "medium").slice(0, 2);
       recommended = [...easy, ...medium];
     } else {
-      // Advanced - medium and hard questions
-      const medium = mockQuestions.filter(q => 
-        q.difficulty === "medium" && !getAttemptByQuestionId(q.id, mockUser.id)
-      ).slice(0, 1);
-      const hard = mockQuestions.filter(q => 
-        q.difficulty === "hard" && !getAttemptByQuestionId(q.id, mockUser.id)
-      ).slice(0, 2);
+      const medium = availableProblems.filter(q => q.difficulty === "medium").slice(0, 1);
+      const hard = availableProblems.filter(q => q.difficulty === "hard").slice(0, 2);
       recommended = [...medium, ...hard];
     }
 
-    // If not enough questions, fill with any available questions
     if (recommended.length < 3) {
-      const remaining = availableQuestions.filter(q => !recommended.includes(q)).slice(0, 3 - recommended.length);
+      const remaining = availableProblems.filter(q => !recommended.includes(q)).slice(0, 3 - recommended.length);
       recommended = [...recommended, ...remaining];
     }
 
     return recommended.slice(0, 3);
   };
 
-  // Filter questions based on search and filters
-  const getFilteredQuestions = () => {
-    let filtered = mockQuestions;
+  const getFilteredQuestions = (): Problem[] => {
+    let filtered = problems;
 
-    // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(q => 
         q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -120,22 +148,20 @@ export default function Dashboard() {
       );
     }
 
-    // Apply difficulty filter
     if (selectedDifficulty !== "all") {
       filtered = filtered.filter(q => q.difficulty === selectedDifficulty.toLowerCase());
     }
 
-    // Apply category filter
     if (selectedCategory !== "all") {
       filtered = filtered.filter(q => q.categories.includes(selectedCategory));
     }
 
-    // Apply status filter
     if (selectedStatus !== "all") {
+      const attemptedProblemIds = new Set(submissions.map(sub => sub.problem_id));
       if (selectedStatus === "attempted") {
-        filtered = filtered.filter(q => getAttemptByQuestionId(q.id, mockUser.id));
+        filtered = filtered.filter(q => attemptedProblemIds.has(q.id));
       } else if (selectedStatus === "not-attempted") {
-        filtered = filtered.filter(q => !getAttemptByQuestionId(q.id, mockUser.id));
+        filtered = filtered.filter(q => !attemptedProblemIds.has(q.id));
       }
     }
 
@@ -144,10 +170,13 @@ export default function Dashboard() {
 
   const filteredQuestions = getFilteredQuestions();
   const recommendedQuestions = getRecommendedQuestions();
-  const categories = [...new Set(mockQuestions.flatMap(q => q.categories))];
-
-  // Calculate completion rate
-  const completionRate = Math.round((userAttempts.length / mockQuestions.length) * 100);
+  const categories = [...new Set(problems.flatMap(q => q.categories))];
+  const completionRate = problems.length > 0 
+    ? Math.round((submissions.length / problems.length) * 100) 
+    : 0;
+  const averageScore = submissions.length > 0
+    ? Math.round(submissions.reduce((sum, sub) => sum + sub.score, 0) / submissions.length)
+    : 0;
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -160,7 +189,7 @@ export default function Dashboard() {
           {/* Header Section */}
           <div className="space-y-2">
             <h1 className="text-4xl font-bold text-foreground">
-              {getGreeting()}, {mockUser.name}! 👋
+              {getGreeting()}, {user?.first_name || 'there'}! 👋
             </h1>
             <p className="text-lg text-muted-foreground italic">
               "{getDynamicSlogan()}"
@@ -169,7 +198,6 @@ export default function Dashboard() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Questions Attempted */}
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
@@ -177,13 +205,12 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Questions Attempted</p>
-                  <p className="text-2xl font-bold text-foreground">{mockUser.stats.totalAttempts}</p>
+                  <p className="text-2xl font-bold text-foreground">{submissions.length}</p>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">↑ 12% from last month</p>
+              <p className="text-xs text-muted-foreground">Keep practicing!</p>
             </div>
 
-            {/* Average Score */}
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
@@ -191,13 +218,12 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Average Score</p>
-                  <p className="text-2xl font-bold text-foreground">{mockUser.stats.averageScore}%</p>
+                  <p className="text-2xl font-bold text-foreground">{averageScore}%</p>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">↑ 5% from last month</p>
+              <p className="text-xs text-muted-foreground">Great progress!</p>
             </div>
 
-            {/* Completion Rate */}
             <div className="bg-card border border-border rounded-lg p-6">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
@@ -208,7 +234,7 @@ export default function Dashboard() {
                   <p className="text-2xl font-bold text-foreground">{completionRate}%</p>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">↑ 8% from last month</p>
+              <p className="text-xs text-muted-foreground">You're doing amazing!</p>
             </div>
           </div>
 
@@ -244,7 +270,7 @@ export default function Dashboard() {
                          <div className="transform transition-transform duration-200 hover:scale-[1.01]">
                            <QuestionCard
                              question={question}
-                             attempt={getAttemptByQuestionId(question.id, mockUser.id)}
+                             attempt={getAttemptByProblemId(question.id)}
                            />
                          </div>
                        </div>
@@ -346,7 +372,7 @@ export default function Dashboard() {
                   <div key={question.id} className="w-full">
                     <QuestionCard
                       question={question}
-                      attempt={getAttemptByQuestionId(question.id, mockUser.id)}
+                      attempt={getAttemptByProblemId(question.id)}
                     />
                   </div>
                 ))}

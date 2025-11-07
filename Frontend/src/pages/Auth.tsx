@@ -5,15 +5,89 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { authService } from '@/services/authService';
+import { useToast } from '@/hooks/use-toast';
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const { toast } = useToast();
 
-  const handleAuth = () => {
-    navigate('/dashboard');
+  // Form states
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleAuth = async () => {
+    if (!email || !password) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isSignUp && (!firstName || !lastName)) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      if (isSignUp) {
+        // Sign up
+        await authService.signup({
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          password: password,
+        });
+
+        toast({
+          title: 'Success',
+          description: 'Account created successfully! Please sign in.',
+        });
+
+        // Switch to sign in mode
+        setIsSignUp(false);
+        setPassword('');
+      } else {
+        // Sign in
+        await authService.login(email, password);
+
+        toast({
+          title: 'Success',
+          description: 'Logged in successfully!',
+        });
+
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Authentication failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleAuth = () => {
+    toast({
+      title: 'Coming Soon',
+      description: 'Google authentication will be available soon!',
+    });
   };
 
   const features = [
@@ -79,7 +153,7 @@ const Auth = () => {
             <h2 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{isSignUp ? 'Sign up' : 'Sign in'}</h2>
             <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{isSignUp ? 'Welcome! Please sign up to continue' : 'Welcome back! Please sign in to continue'}</p>
           </div>
-          <Button variant="outline" className={`w-full mb-6 h-12 ${isDark ? 'border-[#2a2a2a] hover:bg-[#171717]' : 'border-gray-300 hover:bg-gray-50'}`} onClick={handleAuth}>
+          <Button variant="outline" className={`w-full mb-6 h-12 ${isDark ? 'border-[#2a2a2a] hover:bg-[#171717]' : 'border-gray-300 hover:bg-gray-50'}`} onClick={handleGoogleAuth}>
             <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -99,17 +173,41 @@ const Auth = () => {
           <div className="space-y-4">
             {isSignUp && (
               <div className="grid grid-cols-2 gap-4">
-                <Input type="text" placeholder="First name" className={isDark ? 'bg-[#171717] border-[#2a2a2a] h-12' : 'h-12'} />
-                <Input type="text" placeholder="Last name" className={isDark ? 'bg-[#171717] border-[#2a2a2a] h-12' : 'h-12'} />
+                <Input 
+                  type="text" 
+                  placeholder="First name" 
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className={isDark ? 'bg-[#171717] border-[#2a2a2a] h-12' : 'h-12'} 
+                />
+                <Input 
+                  type="text" 
+                  placeholder="Last name" 
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className={isDark ? 'bg-[#171717] border-[#2a2a2a] h-12' : 'h-12'} 
+                />
               </div>
             )}
             <div className="relative">
               <Mail className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
-              <Input type="email" placeholder="Email id" className={`pl-10 h-12 ${isDark ? 'bg-[#171717] border-[#2a2a2a]' : ''}`} />
+              <Input 
+                type="email" 
+                placeholder="Email id" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={`pl-10 h-12 ${isDark ? 'bg-[#171717] border-[#2a2a2a]' : ''}`} 
+              />
             </div>
             <div className="relative">
               <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
-              <Input type="password" placeholder="Password" className={`pl-10 h-12 ${isDark ? 'bg-[#171717] border-[#2a2a2a]' : ''}`} />
+              <Input 
+                type="password" 
+                placeholder="Password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`pl-10 h-12 ${isDark ? 'bg-[#171717] border-[#2a2a2a]' : ''}`} 
+              />
             </div>
             {!isSignUp && (
               <div className="flex items-center justify-between">
@@ -120,8 +218,12 @@ const Auth = () => {
                 <button className="text-sm text-orange-500 hover:text-orange-600">Forgot password?</button>
               </div>
             )}
-            <Button onClick={handleAuth} className="w-full h-12 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white text-base font-medium">
-              {isSignUp ? 'Sign up' : 'Login'}
+            <Button 
+              onClick={handleAuth} 
+              disabled={isLoading}
+              className="w-full h-12 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white text-base font-medium"
+            >
+              {isLoading ? 'Loading...' : (isSignUp ? 'Sign up' : 'Login')}
             </Button>
           </div>
           <div className="mt-6 text-center">

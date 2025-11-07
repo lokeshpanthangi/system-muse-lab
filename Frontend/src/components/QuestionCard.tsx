@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 import { DifficultyBadge } from "./DifficultyBadge";
 import { StatusBadge } from "./StatusBadge";
 import { Button } from "./ui/button";
-import { Question, Attempt } from "@/data/mockData";
+import type { Problem, Submission } from "@/types/api";
 
 interface QuestionCardProps {
-  question: Question;
-  attempt?: Attempt;
+  question: Problem;
+  attempt?: Submission;
 }
 
 export const QuestionCard = ({ question, attempt }: QuestionCardProps) => {
@@ -40,7 +40,7 @@ export const QuestionCard = ({ question, attempt }: QuestionCardProps) => {
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <Clock className="w-4 h-4" />
-            <span>{question.estimatedTime}</span>
+            <span>{question.estimated_time}</span>
           </div>
 
           {attempt ? (

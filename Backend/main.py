@@ -7,7 +7,7 @@ from routes.problem_routes import problem_router
 from routes.submission_routes import submission_router
 
 
-app = FastAPI(title="SystemDesign-io API", version="1.0.0")
+app = FastAPI(title="SystemDesign-io API", version="1.0.3")
 
 
 app.add_middleware(
@@ -27,3 +27,7 @@ app.include_router(submission_router)
 @app.get("/")
 async def root():
     return {"message": "Welcome to the CodeMentor API"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
