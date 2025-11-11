@@ -289,6 +289,8 @@ static/uploads/
 
 docs/_build/
 docs/.doctrees/
+Backend/.env
+Frontend/.env
 
 # ==================================
 # Miscellaneous

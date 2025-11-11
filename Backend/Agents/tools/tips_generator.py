@@ -35,20 +35,17 @@ async def generate_tips(
     try:
         llm = ChatOpenAI(model="gpt-4", temperature=0.7, api_key=api_key)
         
-        system_prompt = """You are a supportive system design mentor. Generate 4-6 specific, actionable tips to help the student improve their solution.
+        system_prompt = """You are a system design mentor. Generate 4-6 specific, actionable tips to improve the solution.
 
-Tips should:
-- Be concrete and actionable (not vague like "improve your design")
-- Reference specific components, patterns, or technologies when relevant
-- Be encouraging and supportive in tone
-- Progress from quick wins to deeper architectural improvements
-- Include both technical details and strategic advice
-- Be directly related to the missing concepts and their current score
+Tips must be:
+- Concrete and actionable (not vague)
+- Reference specific components/patterns
+- Encouraging and supportive
+- Progress from quick wins to deeper improvements
 
-Format: Return ONLY a JSON array of tip strings:
-["Tip 1 with specific actionable advice", "Tip 2 with concrete suggestion", ...]
+Return ONLY JSON array: ["Tip 1", "Tip 2", ...]
 
-Do NOT include any markdown, code blocks, or explanatory text - just the raw JSON array."""
+No markdown, no code blocks, just raw JSON array."""
 
         score = scoring_result.get("score", 0)
         implemented = scoring_result.get("implemented", [])
@@ -60,21 +57,17 @@ Do NOT include any markdown, code blocks, or explanatory text - just the raw JSO
         
         user_prompt = f"""Problem: {problem_data.get('title', 'System Design')}
 
-Requirements:
-{chr(10).join(f"{i+1}. {req}" for i, req in enumerate(problem_data.get('requirements', [])[:5]))}
+Requirements: {', '.join(problem_data.get('requirements', [])[:5])}
 
-Student's Score: {score}/100
+Score: {score}/100
 
-What they did well:
-{implemented_str}
+Did well: {', '.join(implemented[:3]) if implemented else 'Nothing identified'}
 
-What's missing or needs improvement:
-{missing_str}
+Missing: {', '.join(missing[:3]) if missing else 'No gaps'}
 
-Their current diagram summary:
-{diagram_str[:600]}
+Diagram: {diagram_str[:400]}
 
-Generate 4-6 specific, actionable tips to help them improve their system design. Focus on the missing concepts and provide concrete next steps."""
+Generate 4-6 specific tips."""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),

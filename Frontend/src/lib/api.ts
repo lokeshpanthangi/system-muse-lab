@@ -77,6 +77,44 @@ export const submitSession = async (sessionId: string): Promise<SessionSubmitRes
 };
 
 /**
+ * Get all submissions for a specific problem
+ */
+export const getProblemSubmissions = async (problemId: string): Promise<any[]> => {
+  return apiClient.get<any[]>(`/sessions/problem/${problemId}/submissions`);
+};
+
+/**
+ * Stream chat with AI bot (chat history managed on backend)
+ */
+export const streamChat = async (
+  sessionId: string,
+  message: string,
+  diagramData: any
+): Promise<Response> => {
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const accessToken = localStorage.getItem('access_token');
+  
+  const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({
+      message,
+      diagram_data: diagramData || {}
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to get AI response: ${response.status} - ${errorText}`);
+  }
+
+  return response;
+};
+
+/**
  * Abandon a session (user wants to start fresh)
  */
 export const abandonSession = async (sessionId: string): Promise<void> => {

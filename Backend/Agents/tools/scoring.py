@@ -62,52 +62,30 @@ async def score_solution(
     try:
         llm = ChatOpenAI(model="gpt-4", temperature=0.3, api_key=api_key)
         
-        system_prompt = """You are an expert system design evaluator. Your task is to score a student's system design diagram against the problem requirements.
+        system_prompt = """You are a system design evaluator. Score the student's diagram (0-100) against requirements.
 
-Evaluation criteria:
-1. Component completeness: Are all required components present?
-2. Connections: Are components properly connected to show data flow?
-3. Scalability considerations: Does the design account for scale?
-4. Best practices: Does it follow system design patterns?
-5. Labeling and clarity: Are components properly labeled?
+Evaluate: components, connections, scalability, best practices, labels.
 
-Scoring guidelines:
-- 90-100: Exceptional - All requirements met, excellent scalability, best practices
-- 80-89: Very Good - Most requirements met, good architecture, minor improvements needed
-- 70-79: Good - Core requirements met, some scalability concerns
-- 60-69: Adequate - Basic requirements met, significant improvements needed
-- 50-59: Needs Work - Missing key components or major flaws
-- 0-49: Incomplete - Critical components missing or design doesn't work
+Scoring: 90-100 (exceptional), 80-89 (very good), 70-79 (good), 60-69 (adequate), 50-59 (needs work), 0-49 (incomplete).
 
-Output Format:
-Return ONLY a valid JSON object with these keys:
-- "score": number (0-100, be realistic and fair)
-- "implemented": array of 3-6 strings describing what's done well (be specific, reference component names)
-- "missing": array of 2-5 strings describing what's missing or incorrect (be constructive)
-- "breakdown": array of objects with {{requirement: string, achieved: boolean, points: number, note: string}}
+Return ONLY valid JSON:
+{{"score": 0-100, "implemented": ["what's good (3-6 items)"], "missing": ["what's missing (2-5 items)"], "breakdown": [{{"requirement": "req name", "achieved": true/false, "points": number, "note": "brief note"}}]}}
 
-For breakdown, evaluate each requirement separately and assign partial points based on how well it's implemented.
-Be encouraging but accurate. Reference actual components from the diagram by name."""
+Be specific, reference actual component names."""
 
-        user_prompt = f"""Problem:
-{problem_data.get('title', 'Unknown')}
+        user_prompt = f"""Problem: {problem_data.get('title', 'Unknown')}
 
-Description:
-{problem_data.get('description', 'No description provided')}
+Description: {problem_data.get('description', 'No description')[:200]}
 
 Requirements:
-{chr(10).join(f"{i+1}. {req}" for i, req in enumerate(problem_data.get('requirements', ['No requirements specified'])))}
+{chr(10).join(f"{i+1}. {req}" for i, req in enumerate(problem_data.get('requirements', ['No requirements'])[:7]))}
 
 Student's Diagram:
-{diagram_str}
+{diagram_str[:800]}
 
-Diagram Statistics:
-- Total elements: {len(elements)}
-- Components: {len([e for e in elements if e.get('type') in ['rectangle', 'ellipse', 'diamond']])}
-- Arrows: {len([e for e in elements if e.get('type') == 'arrow'])}
-- Text labels: {len([e for e in elements if e.get('type') == 'text'])}
+Stats: {len(elements)} elements, {len([e for e in elements if e.get('type') in ['rectangle', 'ellipse', 'diamond']])} components, {len([e for e in elements if e.get('type') == 'arrow'])} arrows, {len([e for e in elements if e.get('type') == 'text'])} labels
 
-Provide a comprehensive score and detailed feedback in JSON format."""
+Score and provide detailed feedback in JSON."""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),

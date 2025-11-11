@@ -37,29 +37,22 @@ async def fetch_docs_llm(
         
         llm = ChatOpenAI(model="gpt-4", temperature=0.7, api_key=api_key)
         
-        system_prompt = """You are an expert system design educator. Suggest 4-6 high-quality documentation sources and articles for learning system design concepts.
+        system_prompt = """You are a system design educator. Suggest 4-6 documentation sources.
 
-Focus on:
-- Official documentation (AWS, Azure, GCP)
-- System design blogs (High Scalability, Martin Fowler, etc.)
-- Educational resources (GeeksforGeeks, Medium articles)
+Focus on: Official docs (AWS, Azure, GCP), system design blogs, educational resources.
 
-Return ONLY a JSON array:
-[
-  {"title": "Resource title", "url": "actual or suggested URL", "source": "source name", "reason": "why helpful"},
-  ...
-]
+Return ONLY JSON array:
+[{{"title": "Resource title", "url": "real URL", "source": "source name", "reason": "why helpful"}}, ...]
 
-Prefer real, well-known URLs when possible."""
+Prefer real, well-known URLs."""
 
         user_prompt = f"""Problem: {problem_data.get('title', 'System Design')}
 
-Categories: {', '.join(problem_data.get('categories', []))}
+Categories: {', '.join(problem_data.get('categories', [])[:3])}
 
-Missing concepts:
-{chr(10).join(f"- {concept}" for concept in missing_concepts[:5])}
+Missing: {', '.join(missing_concepts[:5])}
 
-Suggest documentation and articles to help learn these concepts."""
+Suggest docs/articles."""
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),

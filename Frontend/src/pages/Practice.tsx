@@ -3,13 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { createSession, autosaveSession, checkSession, submitSession, getProblem, createSubmissionFromSession } from "../lib/api";
+import { createSession, autosaveSession, checkSession, submitSession, getProblem, createSubmissionFromSession, getProblemSubmissions, streamChat } from "../lib/api";
 import type { SessionResponse, SessionCheckResponse, SessionSubmitResponse, Problem } from "../types/api";
 
 export default function Practice() {
   const navigate = useNavigate();
   const { id: problemId } = useParams<{ id: string }>();
-  const { theme, systemTheme } = useTheme();
+  const { theme, systemTheme, setTheme } = useTheme();
   const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(40); // Percentage width
@@ -26,6 +26,10 @@ export default function Practice() {
   const [timeSpent, setTimeSpent] = useState<number>(0);
   const [isCheckingFeedback, setIsCheckingFeedback] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Submissions state
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   
   // Hash tracking for optimization
   const [lastSavedHash, setLastSavedHash] = useState<string>('');
@@ -49,6 +53,18 @@ export default function Practice() {
   // Determine the current theme for Excalidraw
   const currentTheme = theme === "system" ? systemTheme : theme;
   const excalidrawTheme = currentTheme === "dark" ? "dark" : "light";
+
+  // Update canvas background when theme changes
+  useEffect(() => {
+    if (excalidrawAPI) {
+      const bgColor = excalidrawTheme === "dark" ? "#ffffff" : "#000000";
+      excalidrawAPI.updateScene({
+        appState: {
+          viewBackgroundColor: bgColor
+        }
+      });
+    }
+  }, [excalidrawTheme, excalidrawAPI]);
 
   // Function to calculate hash of diagram data
   const calculateDiagramHash = (elements: any) => {
@@ -136,7 +152,7 @@ export default function Practice() {
 
   // Function to handle sending chat messages
   const handleSendMessage = async () => {
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() || !sessionId) return;
 
     const userMessage = {
       id: Date.now().toString(),
@@ -149,21 +165,79 @@ export default function Practice() {
     setChatInput('');
     setIsTyping(true);
 
-    // Simulate AI thinking time
-    setTimeout(() => {
-      const canvasAnalysis = analyzeCanvas();
-      const aiResponse = generateAIResponse(userMessage.content, canvasAnalysis);
-      
-      const aiMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai' as const,
-        content: aiResponse,
-        timestamp: new Date()
-      };
+    // Create AI message placeholder for streaming
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiMessage = {
+      id: aiMessageId,
+      type: 'ai' as const,
+      content: '',
+      timestamp: new Date()
+    };
+    setChatMessages(prev => [...prev, aiMessage]);
 
-      setChatMessages(prev => [...prev, aiMessage]);
+    try {
+      // Get current diagram data (only send elements)
+      const diagramData = excalidrawAPI ? {
+        elements: excalidrawAPI.getSceneElements()
+      } : { elements: [] };
+
+      // Call streaming endpoint (chat history managed on backend now)
+      const response = await streamChat(
+        sessionId,
+        userMessage.content,
+        diagramData
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let accumulatedContent = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const content = line.slice(6); // Remove 'data: ' prefix
+              if (content.trim()) {
+                accumulatedContent += content;
+                
+                // Update AI message with accumulated content
+                setChatMessages(prev => prev.map(msg => 
+                  msg.id === aiMessageId 
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                ));
+              }
+            }
+          }
+        }
+      }
+
       setIsTyping(false);
-    }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
+    } catch (error) {
+      console.error('Error in chat:', error);
+      
+      // Update AI message with error
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === aiMessageId 
+          ? { ...msg, content: 'Sorry, I encountered an error. Please try again.' }
+          : msg
+      ));
+      
+      setIsTyping(false);
+    }
   };
 
   // Function to handle Enter key press in chat input
@@ -243,6 +317,25 @@ export default function Practice() {
       initializeSession();
     }
   }, [problemId, isLoadingProblem, excalidrawAPI]);
+
+  // Load submissions when Solutions tab is active
+  useEffect(() => {
+    const loadSubmissions = async () => {
+      if (activeTab === 'solutions' && problemId && !loadingSubmissions) {
+        setLoadingSubmissions(true);
+        try {
+          const subs = await getProblemSubmissions(problemId);
+          setSubmissions(subs);
+        } catch (error) {
+          console.error('Failed to load submissions:', error);
+        } finally {
+          setLoadingSubmissions(false);
+        }
+      }
+    };
+
+    loadSubmissions();
+  }, [activeTab, problemId]);
 
   // Auto-save session every 10 seconds
   useEffect(() => {
@@ -481,6 +574,34 @@ export default function Practice() {
       alert(`Failed to submit solution: ${errorMessage}\n\nPlease check:\n1. Backend server is running\n2. OPENAI_API_KEY is configured in .env\n3. Browser console for detailed errors`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Function to load a submission's diagram onto canvas
+  const loadSubmissionDiagram = (submission: any) => {
+    if (!excalidrawAPI || !submission.diagram_data) {
+      alert('Canvas not ready or no diagram data');
+      return;
+    }
+
+    try {
+      const currentElements = excalidrawAPI.getSceneElements();
+      const currentAppState = excalidrawAPI.getAppState();
+      
+      // Get submission elements
+      const submissionElements = submission.diagram_data.elements || [];
+      
+      // Paste the submission elements (don't overwrite, just add them)
+      excalidrawAPI.updateScene({
+        elements: [...currentElements, ...submissionElements],
+        appState: currentAppState
+      });
+      
+      console.log('Loaded submission diagram with', submissionElements.length, 'elements');
+      alert(`Loaded submission with score ${submission.score}/${submission.max_score}. Elements pasted on canvas!`);
+    } catch (error) {
+      console.error('Failed to load submission diagram:', error);
+      alert('Failed to load submission diagram');
     }
   };
 
@@ -843,6 +964,62 @@ export default function Practice() {
               <SidebarIcon />
             </button>
 
+            {/* Theme Toggle Button */}
+            <button
+              onClick={() => {
+                const newTheme = currentTheme === "dark" ? "light" : "dark";
+                setTheme(newTheme);
+              }}
+              title={`Switch to ${currentTheme === "dark" ? "Light" : "Dark"} Mode`}
+              style={{
+                position: "absolute",
+                top: "10px",
+                right: "60px",
+                zIndex: 1001,
+                padding: "10px",
+                backgroundColor: "transparent",
+                color: "#6b7280",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s ease",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f3f4f6";
+                e.currentTarget.style.color = "#374151";
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#6b7280";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+              }}
+            >
+              {currentTheme === "dark" ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"/>
+                  <line x1="12" y1="1" x2="12" y2="3"/>
+                  <line x1="12" y1="21" x2="12" y2="23"/>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                  <line x1="1" y1="12" x2="3" y2="12"/>
+                  <line x1="21" y1="12" x2="23" y2="12"/>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+              )}
+            </button>
+
             {/* Tab Navigation */}
             <div className="flex border-b border-sidebar-border mb-4">
               <button
@@ -1075,74 +1252,67 @@ export default function Practice() {
                 <div className="space-y-6">
                   <div className="text-center py-8">
                     <div className="text-4xl mb-4">💡</div>
-                    <h2 className="text-xl font-bold text-sidebar-foreground mb-2">Solutions</h2>
+                    <h2 className="text-xl font-bold text-sidebar-foreground mb-2">Your Solutions</h2>
                     <p className="text-muted-foreground text-sm mb-6">
-                      Explore different approaches and reference implementations
+                      View and load your previous submissions
                     </p>
                   </div>
 
-                  {/* Solution Approaches */}
-                  <div className="space-y-4">
-                    <div className="bg-card border border-sidebar-border rounded-lg p-4">
-                      <h3 className="text-base font-semibold text-sidebar-foreground mb-3 flex items-center gap-2">
-                        🎯 Approach 1: Basic Architecture
-                      </h3>
-                      <div className="text-sm text-muted-foreground leading-relaxed mb-3">
-                        A simple, straightforward solution focusing on core functionality.
-                      </div>
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-success">✓ Pros:</div>
-                        <div className="text-xs text-muted-foreground ml-4">
-                          • Easy to implement and understand<br/>
-                          • Lower complexity and maintenance
-                        </div>
-                        <div className="text-xs font-medium text-destructive mt-2">✗ Cons:</div>
-                        <div className="text-xs text-muted-foreground ml-4">
-                          • Limited scalability<br/>
-                          • May not handle high traffic
-                        </div>
-                      </div>
+                  {loadingSubmissions ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Loading submissions...
                     </div>
-
-                    <div className="bg-card border border-sidebar-border rounded-lg p-4">
-                      <h3 className="text-base font-semibold text-sidebar-foreground mb-3 flex items-center gap-2">
-                        🚀 Approach 2: Scalable Architecture
-                      </h3>
-                      <div className="text-sm text-muted-foreground leading-relaxed mb-3">
-                        A more sophisticated solution with caching, load balancing, and microservices.
-                      </div>
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-success">✓ Pros:</div>
-                        <div className="text-xs text-muted-foreground ml-4">
-                          • Highly scalable and performant<br/>
-                          • Fault tolerant and resilient
-                        </div>
-                        <div className="text-xs font-medium text-destructive mt-2">✗ Cons:</div>
-                        <div className="text-xs text-muted-foreground ml-4">
-                          • Higher complexity<br/>
-                          • More infrastructure overhead
-                        </div>
-                      </div>
+                  ) : submissions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="text-6xl mb-4">📝</div>
+                      <p className="text-muted-foreground text-sm">
+                        No submissions yet. Complete and submit a solution to see it here!
+                      </p>
                     </div>
-                  </div>
-
-                  {/* Reference Links */}
-                  <div className="bg-accent/10 border border-accent/20 rounded-lg p-4">
-                    <h3 className="text-base font-semibold text-accent mb-3 flex items-center gap-2">
-                      📚 Reference Materials
-                    </h3>
-                    <div className="space-y-2">
-                      <a href="#" className="block text-sm text-primary hover:underline">
-                        → System Design Primer
-                      </a>
-                      <a href="#" className="block text-sm text-primary hover:underline">
-                        → High Scalability Blog
-                      </a>
-                      <a href="#" className="block text-sm text-primary hover:underline">
-                        → AWS Architecture Center
-                      </a>
+                  ) : (
+                    <div className="space-y-4">
+                      {submissions.map((submission, index) => (
+                        <div 
+                          key={submission.submission_id}
+                          className="bg-card border border-sidebar-border rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                          onClick={() => loadSubmissionDiagram(submission)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-base font-semibold text-sidebar-foreground flex items-center gap-2">
+                              📊 Submission #{submissions.length - index}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-lg font-bold ${
+                                submission.score >= 80 ? 'text-green-600' :
+                                submission.score >= 60 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {submission.score}/{submission.max_score}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-xs text-muted-foreground mb-3">
+                            Submitted: {new Date(submission.submitted_at).toLocaleString()}
+                          </div>
+                          
+                          <div className="text-xs text-muted-foreground mb-2">
+                            Time spent: {Math.floor(submission.time_spent / 60)}m {submission.time_spent % 60}s
+                          </div>
+                          
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              loadSubmissionDiagram(submission);
+                            }}
+                            className="w-full mt-3 px-3 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded text-sm font-medium transition-colors"
+                          >
+                            📋 Load This Diagram
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1189,7 +1359,7 @@ export default function Practice() {
           initialData={{
             elements: [],
             appState: {
-              viewBackgroundColor: "#ffffff", // Always white background
+              viewBackgroundColor: excalidrawTheme === "dark" ? "#ffffff" : "#000000",
               collaborators: new Map(),
             },
           }}
