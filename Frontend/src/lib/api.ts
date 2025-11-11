@@ -94,7 +94,7 @@ export const streamChat = async (
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
   const accessToken = localStorage.getItem('access_token');
   
-  const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/chat`, {
+  const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/ai-chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

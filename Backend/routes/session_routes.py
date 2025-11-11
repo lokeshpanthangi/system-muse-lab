@@ -766,7 +766,7 @@ async def get_problem_submissions(
     return submissions
 
 
-@router.post("/sessions/{session_id}/chat")
+@router.post("/{session_id}/ai-chat")
 async def chat_with_ai(
     session_id: str,
     request: AIChatRequest,
