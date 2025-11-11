@@ -1,6 +1,6 @@
 """
 Tips Generator Tool
-Generates personalized, actionable tips using GPT-4 LLM.
+Generates personalized, actionable tips using gpt-4o-mini LLM.
 Requires OPENAI_API_KEY environment variable.
 """
 from typing import List, Dict, Any
@@ -16,7 +16,7 @@ async def generate_tips(
     diagram_str: str
 ) -> List[str]:
     """
-    Use GPT-4 LLM to generate personalized, actionable tips.
+    Use gpt-4o-mini LLM to generate personalized, actionable tips.
     
     Args:
         problem_data: Problem info with title, requirements, etc.
@@ -33,7 +33,7 @@ async def generate_tips(
         return []
     
     try:
-        llm = ChatOpenAI(model="gpt-4", temperature=0.7, api_key=api_key)
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7, api_key=api_key)
         
         system_prompt = """You are a system design mentor. Generate 4-6 specific, actionable tips to improve the solution.
 
@@ -42,6 +42,7 @@ Tips must be:
 - Reference specific components/patterns
 - Encouraging and supportive
 - Progress from quick wins to deeper improvements
+- Grounded ONLY in the provided problem description, requirements, scoring summary, and diagram. Do not introduce unrelated topics or generic advice.
 
 Return ONLY JSON array: ["Tip 1", "Tip 2", ...]
 

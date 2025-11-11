@@ -54,18 +54,21 @@ export default function Practice() {
   // Determine the current theme for Excalidraw
   const currentTheme = theme === "system" ? systemTheme : theme;
   const excalidrawTheme = currentTheme === "dark" ? "dark" : "light";
+  const excalidrawBackground = excalidrawTheme === "dark" ? "#0f172a" : "#ffffff";
 
   // Update canvas background when theme changes
   useEffect(() => {
-    if (excalidrawAPI) {
-      const bgColor = excalidrawTheme === "dark" ? "#ffffff" : "#000000";
-      excalidrawAPI.updateScene({
-        appState: {
-          viewBackgroundColor: bgColor
-        }
-      });
-    }
-  }, [excalidrawTheme, excalidrawAPI]);
+    if (!excalidrawAPI) return;
+
+    // Preserve current app state while only adjusting the background color to avoid tool glitches
+    const currentAppState = excalidrawAPI.getAppState();
+    excalidrawAPI.updateScene({
+      appState: {
+        ...currentAppState,
+        viewBackgroundColor: excalidrawBackground,
+      },
+    });
+  }, [excalidrawBackground, excalidrawAPI]);
 
   // Function to calculate hash of diagram data
   const calculateDiagramHash = (elements: any) => {
@@ -387,11 +390,11 @@ export default function Practice() {
         appState: {
           ...currentAppState,
           theme: excalidrawTheme,
-          viewBackgroundColor: "#ffffff", // Always white background
+          viewBackgroundColor: excalidrawBackground,
         }
       });
     }
-  }, [excalidrawTheme, excalidrawAPI]);
+  }, [excalidrawTheme, excalidrawBackground, excalidrawAPI]);
 
   const handleCheck = async () => {
     console.log('Check button clicked');
@@ -1298,7 +1301,7 @@ export default function Practice() {
           initialData={{
             elements: [],
             appState: {
-              viewBackgroundColor: excalidrawTheme === "dark" ? "#ffffff" : "#000000",
+              viewBackgroundColor: excalidrawBackground,
               collaborators: new Map(),
             },
           }}

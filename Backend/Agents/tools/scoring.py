@@ -1,6 +1,6 @@
 """
 Scoring Tool
-Evaluates user's system design solution using GPT-4 LLM.
+Evaluates user's system design solution using gpt-4o-mini LLM.
 Requires OPENAI_API_KEY environment variable.
 """
 from typing import Dict, Any
@@ -16,7 +16,7 @@ async def score_solution(
     diagram_str: str
 ) -> Dict[str, Any]:
     """
-    Use GPT-4 LLM to evaluate the system design solution.
+    Use gpt-4o-mini LLM to evaluate the system design solution.
     
     Args:
         problem_data: Problem requirements and info
@@ -60,18 +60,20 @@ async def score_solution(
         }
     
     try:
-        llm = ChatOpenAI(model="gpt-4", temperature=0.3, api_key=api_key)
+        llm = ChatOpenAI(model="gpt-4o-minio-mini", temperature=0.3, api_key=api_key)
         
         system_prompt = """You are a system design evaluator. Score the student's diagram (0-100) against requirements.
 
 Evaluate: components, connections, scalability, best practices, labels.
+
+Focus strictly on the system design question and diagram provided. Do NOT introduce requirements or advice unrelated to this problem. If information is missing from the diagram, point that out instead of speculating.
 
 Scoring: 90-100 (exceptional), 80-89 (very good), 70-79 (good), 60-69 (adequate), 50-59 (needs work), 0-49 (incomplete).
 
 Return ONLY valid JSON:
 {{"score": 0-100, "implemented": ["what's good (3-6 items)"], "missing": ["what's missing (2-5 items)"], "breakdown": [{{"requirement": "req name", "achieved": true/false, "points": number, "note": "brief note"}}]}}
 
-Be specific, reference actual component names."""
+Be specific, reference actual component names, and tie every remark back to the stated requirements."""
 
         user_prompt = f"""Problem: {problem_data.get('title', 'Unknown')}
 
@@ -84,6 +86,8 @@ Student's Diagram:
 {diagram_str[:800]}
 
 Stats: {len(elements)} elements, {len([e for e in elements if e.get('type') in ['rectangle', 'ellipse', 'diamond']])} components, {len([e for e in elements if e.get('type') == 'arrow'])} arrows, {len([e for e in elements if e.get('type') == 'text'])} labels
+
+Deliver feedback that applies ONLY to this problem statement. If a requirement is unclear or absent in the diagram, flag it as missing rather than inventing new scope.
 
 Score and provide detailed feedback in JSON."""
 

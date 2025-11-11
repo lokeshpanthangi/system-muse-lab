@@ -1,6 +1,6 @@
 """
 Checking Agent
-Analyzes user's Excalidraw diagram against question requirements using LangChain and GPT-4
+Analyzes user's Excalidraw diagram against question requirements using LangChain and gpt-4o-mini
 """
 import os
 import json
@@ -20,14 +20,14 @@ class CheckingAgent:
     """Agent for checking user's system design solutions"""
     
     def __init__(self):
-        """Initialize the checking agent with GPT-4"""
-        # Initialize LLM (GPT-4)
+        """Initialize the checking agent with gpt-4o-mini"""
+        # Initialize LLM (gpt-4o-mini)
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         
         self.llm = ChatOpenAI(
-            model="gpt-4",
+            model="gpt-4o-minio-mini",
             temperature=0.3,  # Slightly creative but mostly accurate
             api_key=api_key
         )

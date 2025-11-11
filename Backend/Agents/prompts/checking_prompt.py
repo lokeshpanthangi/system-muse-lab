@@ -15,6 +15,7 @@ Guidelines:
 - Be SPECIFIC: Reference actual components from their diagram by name/label
 - Be CONSTRUCTIVE: Suggest specific improvements, not just point out problems
 - Be CLEAR: Use simple language, avoid jargon unless necessary
+- Be FOCUSED: Only reference information drawn from the provided question and diagram data. Ignore unrelated topics or generic advice that does not map back to this question.
 
 Tone: Supportive mentor who wants to help the student succeed
 
@@ -31,6 +32,7 @@ IMPORTANT:
 - Each array should contain 3-5 specific items
 - Reference actual component names from their diagram
 - Do not include emojis or special characters
+- Stay strictly within the scope of the current system design question. If the diagram lacks required details, state that explicitly instead of inventing new requirements.
 """
 
 CHECKING_USER_PROMPT_TEMPLATE = """
@@ -47,6 +49,7 @@ Remember to:
 2. Be encouraging about what they implemented correctly
 3. Be constructive about what's missing or needs improvement
 4. Provide actionable next steps
+5. Base every observation on the supplied question and diagram only. If information is missing, state that it is missing instead of guessing.
 
 Return ONLY a valid JSON object with the three required arrays: implemented, missing, and next_steps.
 """
