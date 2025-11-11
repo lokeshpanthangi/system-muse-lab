@@ -12,7 +12,6 @@ import CRUD.session_crud as session_crud
 import CRUD.problem_crud as problem_crud
 from Agents.checking_agent import analyze_user_solution
 from Agents.submit_agent import evaluate_submission
-from Agents.chatbot import chat_with_bot
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -35,10 +34,6 @@ class SessionPause(BaseModel):
 class ChatMessageCreate(BaseModel):
     role: str
     content: str
-
-class AIChatRequest(BaseModel):
-    message: str
-    diagram_data: Dict[Any, Any] = {}
 
 class CheckFeedbackResponse(BaseModel):
     session_id: str
@@ -764,61 +759,3 @@ async def get_problem_submissions(
         })
     
     return submissions
-
-
-@router.post("/{session_id}/ai-chat")
-async def chat_with_ai(
-    session_id: str,
-    request: AIChatRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    """Stream AI chat responses based on current diagram and problem context"""
-    
-    # Get session to retrieve problem data
-    sessions_collection = db.get_collection("sessions")
-    session = await sessions_collection.find_one({
-        "_id": ObjectId(session_id),
-        "user_id": current_user["id"]
-    })
-    
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Get problem details
-    problems_collection = db.get_collection("problems")
-    problem = await problems_collection.find_one({
-        "_id": ObjectId(session["problem_id"])
-    })
-    
-    if not problem:
-        raise HTTPException(status_code=404, detail="Problem not found")
-    
-    # Prepare problem data for chatbot
-    problem_data = {
-        "title": problem.get("title", "System Design Problem"),
-        "description": problem.get("description", ""),
-        "requirements": problem.get("requirements", [])
-    }
-    
-    # Stream response
-    async def generate_stream():
-        try:
-            async for chunk in chat_with_bot(
-                session_id=session_id,
-                problem_data=problem_data,
-                diagram_data=request.diagram_data,
-                user_message=request.message
-            ):
-                yield f"data: {chunk}\n\n"
-        except Exception as e:
-            yield f"data: ERROR: {str(e)}\n\n"
-    
-    return StreamingResponse(
-        generate_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
-        }
-    )
-

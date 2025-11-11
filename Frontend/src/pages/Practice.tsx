@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+import { AIChat } from "../components/AIChat";
 import { createSession, autosaveSession, checkSession, submitSession, getProblem, createSubmissionFromSession, getProblemSubmissions, streamChat } from "../lib/api";
 import type { SessionResponse, SessionCheckResponse, SessionSubmitResponse, Problem } from "../types/api";
 
@@ -181,7 +182,7 @@ export default function Practice() {
         elements: excalidrawAPI.getSceneElements()
       } : { elements: [] };
 
-      // Call streaming endpoint (chat history managed on backend now)
+      // Call streaming endpoint
       const response = await streamChat(
         sessionId,
         userMessage.content,
@@ -192,7 +193,7 @@ export default function Practice() {
         throw new Error('Failed to get AI response');
       }
 
-      // Handle streaming response
+      // Handle REAL streaming response (SSE)
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
@@ -210,10 +211,10 @@ export default function Practice() {
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const content = line.slice(6); // Remove 'data: ' prefix
-              if (content.trim()) {
+              if (content.trim() && !content.startsWith('ERROR:')) {
                 accumulatedContent += content;
                 
-                // Update AI message with accumulated content
+                // Update AI message with accumulated content (REAL STREAMING!)
                 setChatMessages(prev => prev.map(msg => 
                   msg.id === aiMessageId 
                     ? { ...msg, content: accumulatedContent }
@@ -226,10 +227,11 @@ export default function Practice() {
       }
 
       setIsTyping(false);
+      
     } catch (error) {
       console.error('Error in chat:', error);
       
-      // Update AI message with error
+      // Add error message
       setChatMessages(prev => prev.map(msg => 
         msg.id === aiMessageId 
           ? { ...msg, content: 'Sorry, I encountered an error. Please try again.' }
@@ -1174,77 +1176,14 @@ export default function Practice() {
 
               {/* AI Insights Tab Content */}
               {activeTab === 'ai-insights' && (
-                <div className="flex flex-col h-full">
-                  {/* Chat Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {chatMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                            message.type === 'user'
-                              ? 'bg-primary text-primary-foreground ml-4'
-                              : 'bg-card border border-sidebar-border mr-4'
-                          }`}
-                        >
-                          <p className="leading-relaxed">{message.content}</p>
-                          <p className={`text-xs mt-1 opacity-70 ${
-                            message.type === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                          }`}>
-                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {/* Typing Indicator */}
-                    {isTyping && (
-                      <div className="flex justify-start">
-                        <div className="bg-card border border-sidebar-border rounded-lg px-3 py-2 mr-4">
-                          <div className="flex items-center gap-1">
-                            <div className="flex gap-1">
-                              <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                              <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                              <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                            </div>
-                            <span className="text-xs text-muted-foreground ml-2">AI is thinking...</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Chat Input */}
-                  <div className="p-4 border-t border-sidebar-border bg-card/30">
-                    <div className="flex gap-2">
-                      <textarea
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Ask about your system design..."
-                        className="flex-1 min-h-[40px] max-h-[120px] px-3 py-2 text-sm bg-background border border-sidebar-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                        disabled={isTyping}
-                        rows={1}
-                        style={{ 
-                          scrollbarWidth: 'thin',
-                          scrollbarColor: 'hsl(var(--muted-foreground)) transparent'
-                        }}
-                      />
-                      <button
-                        onClick={handleSendMessage}
-                        disabled={!chatInput.trim() || isTyping}
-                        className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                      >
-                        Send
-                      </button>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      💡 I can analyze your current diagram and provide contextual advice
-                    </p>
-                  </div>
-                </div>
+                <AIChat
+                  messages={chatMessages}
+                  isTyping={isTyping}
+                  chatInput={chatInput}
+                  onChatInputChange={setChatInput}
+                  onSendMessage={handleSendMessage}
+                  onKeyPress={handleKeyPress}
+                />
               )}
 
               {/* Solutions Tab Content */}

@@ -85,12 +85,14 @@ def extract_excalidraw_components(diagram_data: dict) -> str:
     if arrows:
         output_lines.append("=== CONNECTIONS ===")
         for idx, arrow in enumerate(arrows, 1):
-            start = arrow.get('startBinding', {}).get('elementId', 'unknown')
-            end = arrow.get('endBinding', {}).get('elementId', 'unknown')
+            start_binding = arrow.get('startBinding') or {}
+            end_binding = arrow.get('endBinding') or {}
+            start = start_binding.get('elementId', 'unknown')
+            end = end_binding.get('elementId', 'unknown')
             label = arrow.get('text', '')
             
             output_lines.append(f"{idx}. ARROW (ID: {arrow['id'][:8]}...)")
-            output_lines.append(f"   From: {start[:8]}... → To: {end[:8]}...")
+            output_lines.append(f"   From: {start[:8] if start != 'unknown' else start}... → To: {end[:8] if end != 'unknown' else end}...")
             if label:
                 output_lines.append(f"   Label: \"{label}\"")
             output_lines.append("")

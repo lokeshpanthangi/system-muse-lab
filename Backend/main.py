@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-
+from Agents.chatbot import chat
 from routes.user_routes import user_router
 from routes.problem_routes import problem_router
 from routes.submission_routes import submission_router
@@ -17,12 +17,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.include_router(user_router)
 app.include_router(problem_router)
 app.include_router(submission_router)
 app.include_router(session_router)
+app.include_router(chat)
 
 
 
