@@ -5,7 +5,14 @@ langchain-core
 langchain-openai
 langchain-community
 motor
+pymongo
+dnspython
 pydantic
 jwt
+passlib
+bcrypt
+requests
 python-dotenv
+python-multipart
+email-validator
 openai
