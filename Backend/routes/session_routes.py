@@ -8,6 +8,7 @@ from models import User
 import CRUD.session_crud as session_crud
 import CRUD.problem_crud as problem_crud
 from Agents.checking_agent import analyze_user_solution
+from Agents.submit_agent import evaluate_submission
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -38,6 +39,31 @@ class CheckFeedbackResponse(BaseModel):
     timestamp: datetime
     diagram_hash: str
     cached: bool = False
+
+class ResourceItem(BaseModel):
+    title: str
+    url: str
+    channel: Optional[str] = None
+    source: Optional[str] = None
+    reason: Optional[str] = None
+
+class ScoreBreakdownItem(BaseModel):
+    requirement: str
+    achieved: bool
+    points: float
+    note: Optional[str] = None
+
+class SubmitResponse(BaseModel):
+    submission_id: str
+    session_id: str
+    problem_id: str
+    score: float
+    max_score: float
+    breakdown: List[ScoreBreakdownItem]
+    feedback: Dict[str, List[str]]  # {implemented, missing, next_steps}
+    tips: List[str]
+    resources: Dict[str, List[ResourceItem]]  # {videos, docs}
+    timestamp: datetime
 
 class ExcalidrawExtractResponse(BaseModel):
     session_id: str
@@ -569,3 +595,131 @@ async def get_my_sessions(
     )
     
     return [format_session(session) for session in sessions]
+
+@router.post("/{session_id}/submit", response_model=SubmitResponse)
+async def submit_solution(
+    session_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Submit the user's solution for final evaluation.
+    
+    - Scores the solution (0-100)
+    - Provides detailed feedback (implemented, missing, next steps)
+    - Generates personalized tips
+    - Fetches learning resources (YouTube videos + documentation)
+    - Marks session as 'submitted'
+    - Creates a submission record
+    
+    Returns comprehensive evaluation result.
+    """
+    # Get session
+    session = await session_crud.get_session_by_id(session_id)
+    
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    # Verify ownership
+    if session["user_id"] != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this session"
+        )
+    
+    # Check if already submitted
+    if session.get("status") == "submitted":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session already submitted. Create a new session to try again."
+        )
+    
+    # Get problem data
+    problem = await problem_crud.get_problem_by_id(session["problem_id"])
+    
+    if not problem:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Problem not found"
+        )
+    
+    # Format problem data for agent
+    problem_data = {
+        "title": problem.get("title", ""),
+        "description": problem.get("description", ""),
+        "requirements": problem.get("requirements", []),
+        "constraints": problem.get("constraints", []),
+        "hints": problem.get("hints", []),
+        "difficulty": problem.get("difficulty", ""),
+        "categories": problem.get("categories", [])
+    }
+    
+    # Get diagram data
+    diagram_data = session.get("diagram_data", {})
+    
+    # Validate diagram
+    elements = diagram_data.get("elements", [])
+    if not elements or len(elements) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot submit empty diagram. Please draw your solution first."
+        )
+    
+    # Run submission evaluation
+    try:
+        evaluation = await evaluate_submission(
+            problem_data=problem_data,
+            diagram_data=diagram_data
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Submission evaluation failed: {str(e)}"
+        )
+    
+    # Create submission record in database
+    from database import db
+    submissions_collection = db.get_collection("submissions")
+    
+    submission_doc = {
+        "user_id": current_user.id,
+        "problem_id": session["problem_id"],
+        "session_id": session_id,
+        "diagram_data": diagram_data,
+        "score": evaluation["score"],
+        "max_score": evaluation["max_score"],
+        "breakdown": evaluation["breakdown"],
+        "feedback": evaluation["feedback"],
+        "tips": evaluation["tips"],
+        "resources": evaluation["resources"],
+        "time_spent": session.get("time_spent", 0),
+        "status": "completed",
+        "submitted_at": datetime.utcnow(),
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    result = await submissions_collection.insert_one(submission_doc)
+    submission_id = str(result.inserted_id)
+    
+    # Update session status to 'submitted'
+    await session_crud.mark_session_submitted(session_id, current_user.id)
+    
+    # Return evaluation result
+    return SubmitResponse(
+        submission_id=submission_id,
+        session_id=session_id,
+        problem_id=session["problem_id"],
+        score=evaluation["score"],
+        max_score=evaluation["max_score"],
+        breakdown=[ScoreBreakdownItem(**item) for item in evaluation["breakdown"]],
+        feedback=evaluation["feedback"],
+        tips=evaluation["tips"],
+        resources={
+            "videos": [ResourceItem(**v) for v in evaluation["resources"]["videos"]],
+            "docs": [ResourceItem(**d) for d in evaluation["resources"]["docs"]]
+        },
+        timestamp=datetime.utcnow()
+    )

@@ -4,6 +4,7 @@ import type {
   SessionCreate,
   SessionAutosave,
   SessionCheckResponse,
+  SessionSubmitResponse,
   SessionResponse,
   Problem,
   ProblemsListResponse,
@@ -66,6 +67,13 @@ export const resumeSession = async (sessionId: string): Promise<SessionResponse>
  */
 export const checkSession = async (sessionId: string): Promise<SessionCheckResponse> => {
   return apiClient.post<SessionCheckResponse>(`/sessions/${sessionId}/check`, {});
+};
+
+/**
+ * Submit solution for final evaluation (Submit button)
+ */
+export const submitSession = async (sessionId: string): Promise<SessionSubmitResponse> => {
+  return apiClient.post<SessionSubmitResponse>(`/sessions/${sessionId}/submit`, {});
 };
 
 /**

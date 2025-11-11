@@ -43,7 +43,9 @@ export default function Results() {
   const { isCollapsed } = useSidebar();
   const [isLoading, setIsLoading] = useState(true);
   
+  console.log('Results page - location.state:', location.state);
   const feedbackContent: FeedbackContent | null = location.state?.feedbackContent;
+  console.log('Results page - feedbackContent:', feedbackContent);
 
   useEffect(() => {
     // Simulate loading

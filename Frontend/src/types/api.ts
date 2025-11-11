@@ -184,6 +184,41 @@ export interface SessionCheckResponse {
   timestamp: string;
 }
 
+export interface ResourceItem {
+  title: string;
+  url: string;
+  channel?: string;
+  source?: string;
+  reason?: string;
+}
+
+export interface ScoreBreakdownItem {
+  requirement: string;
+  achieved: boolean;
+  points: number;
+  note?: string;
+}
+
+export interface SessionSubmitResponse {
+  submission_id: string;
+  session_id: string;
+  problem_id: string;
+  score: number;
+  max_score: number;
+  breakdown: ScoreBreakdownItem[];
+  feedback: {
+    implemented: string[];
+    missing: string[];
+    next_steps: string[];
+  };
+  tips: string[];
+  resources: {
+    videos: ResourceItem[];
+    docs: ResourceItem[];
+  };
+  timestamp: string;
+}
+
 export interface SessionResponse {
   message?: string;
   session?: Session;

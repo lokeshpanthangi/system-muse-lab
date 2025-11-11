@@ -12,6 +12,7 @@ from CRUD.submission_crud import (
     delete_submission
 )
 from CRUD.session_crud import get_session_by_id, mark_session_submitted
+import CRUD.problem_crud as problem_crud
 from auth import verify_access_token
 
 submission_router = APIRouter(prefix="/submissions", tags=["Submissions"])

@@ -3,8 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { createSession, autosaveSession, checkSession, getProblem, createSubmissionFromSession } from "../lib/api";
-import type { SessionResponse, SessionCheckResponse, Problem } from "../types/api";
+import { createSession, autosaveSession, checkSession, submitSession, getProblem, createSubmissionFromSession } from "../lib/api";
+import type { SessionResponse, SessionCheckResponse, SessionSubmitResponse, Problem } from "../types/api";
 
 export default function Practice() {
   const navigate = useNavigate();
@@ -17,6 +17,7 @@ export default function Practice() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackType, setFeedbackType] = useState<'check' | 'submit' | null>(null);
   const [feedbackContent, setFeedbackContent] = useState<any>(null);
+  const [submitResult, setSubmitResult] = useState<SessionSubmitResponse | null>(null);
   const [activeTab, setActiveTab] = useState('question'); // 'question', 'ai-insights', 'solutions'
   
   // Session state
@@ -390,6 +391,99 @@ export default function Practice() {
     }
   };
 
+  const handleSubmit = async () => {
+    console.log('Submit button clicked');
+    
+    if (!sessionId) {
+      console.error('No active session');
+      alert('No active session found. Please refresh the page.');
+      return;
+    }
+
+    if (!excalidrawAPI) {
+      console.error('Excalidraw API not ready');
+      alert('Canvas not ready. Please wait a moment and try again.');
+      return;
+    }
+
+    const elements = excalidrawAPI.getSceneElements();
+    
+    if (!elements || elements.length === 0) {
+      alert('Cannot submit empty diagram. Please draw your solution first.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const appState = excalidrawAPI.getAppState();
+      const currentTimeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+
+      console.log('Saving current state before submit...');
+      // Save one final time before submitting
+      await autosaveSession(sessionId, {
+        diagram_data: {
+          elements,
+          appState
+        },
+        time_spent: currentTimeSpent
+      });
+
+      console.log('Calling submit API...');
+      // Call submit API
+      const submitResponse: SessionSubmitResponse = await submitSession(sessionId);
+      console.log('Submit response received:', submitResponse);
+      
+      // Prepare feedback content
+      const feedbackContent = {
+        score: submitResponse.score,
+        maxScore: submitResponse.max_score,
+        strengths: submitResponse.feedback.implemented,
+        weaknesses: submitResponse.feedback.missing,
+        learningResources: [
+          ...submitResponse.resources.videos.map(v => ({
+            title: v.title,
+            url: v.url,
+            description: v.reason || v.channel || 'Video tutorial'
+          })),
+          ...submitResponse.resources.docs.map(d => ({
+            title: d.title,
+            url: d.url,
+            description: d.reason || d.source || 'Documentation'
+          }))
+        ],
+        questions: submitResponse.tips || []
+      };
+      
+      console.log('Navigating to results with feedbackContent:', feedbackContent);
+      
+      // Navigate to Results page with the submission data
+      navigate('/results', {
+        state: {
+          feedbackContent,
+          submissionId: submitResponse.submission_id
+        }
+      });
+    } catch (error) {
+      console.error('Submit failed with error:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      let errorMessage = 'Unknown error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error);
+      }
+      
+      // Show error feedback
+      alert(`Failed to submit solution: ${errorMessage}\n\nPlease check:\n1. Backend server is running\n2. OPENAI_API_KEY is configured in .env\n3. Browser console for detailed errors`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCheck_OLD = () => {
     if (!excalidrawAPI) return;
     
@@ -449,54 +543,6 @@ export default function Practice() {
     setFeedbackContent(feedback);
     setFeedbackType('check');
     setShowFeedback(true);
-  };
-
-  const handleSubmit = async () => {
-    if (!sessionId) {
-      console.error('No active session');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      // First save current state
-      if (excalidrawAPI) {
-        const elements = excalidrawAPI.getSceneElements();
-        const appState = excalidrawAPI.getAppState();
-        const currentTimeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
-
-        await autosaveSession(sessionId, {
-          diagram_data: {
-            elements,
-            appState
-          },
-          time_spent: currentTimeSpent
-        });
-      }
-
-      // Convert session to submission (this will delete the session and create submission)
-      const response = await createSubmissionFromSession(sessionId);
-      
-      // Handle both response formats (wrapped or direct)
-      const submission = (response as any).submission || response;
-      
-      console.log('Submission created:', submission);
-
-      // Navigate to Results page
-      navigate('/results', { 
-        state: { 
-          submissionId: submission.id,
-          score: submission.score || 0,
-          feedback: submission.feedback
-        } 
-      });
-    } catch (error) {
-      console.error('Submit failed:', error);
-      alert('Failed to submit. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleSubmit_OLD = () => {
