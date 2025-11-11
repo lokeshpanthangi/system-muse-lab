@@ -1,6 +1,11 @@
 fastapi
 uvicorn
 langchain
+langchain-core
+langchain-openai
+langchain-community
 motor
 pydantic
 jwt
+python-dotenv
+openai

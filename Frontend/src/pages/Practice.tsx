@@ -1,11 +1,14 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+import { createSession, autosaveSession, checkSession, getProblem, createSubmissionFromSession } from "../lib/api";
+import type { SessionResponse, SessionCheckResponse, Problem } from "../types/api";
 
 export default function Practice() {
   const navigate = useNavigate();
+  const { id: problemId } = useParams<{ id: string }>();
   const { theme, systemTheme } = useTheme();
   const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -15,6 +18,22 @@ export default function Practice() {
   const [feedbackType, setFeedbackType] = useState<'check' | 'submit' | null>(null);
   const [feedbackContent, setFeedbackContent] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('question'); // 'question', 'ai-insights', 'solutions'
+  
+  // Session state
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
+  const [timeSpent, setTimeSpent] = useState<number>(0);
+  const [isCheckingFeedback, setIsCheckingFeedback] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Hash tracking for optimization
+  const [lastSavedHash, setLastSavedHash] = useState<string>('');
+  const [lastCheckHash, setLastCheckHash] = useState<string>('');
+  const [lastCheckFeedback, setLastCheckFeedback] = useState<any>(null);
+  
+  // Problem state
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [isLoadingProblem, setIsLoadingProblem] = useState(true);
   
   // State for AI chatbot
   const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'user' | 'ai', content: string, timestamp: Date}>>([{
@@ -29,6 +48,19 @@ export default function Practice() {
   // Determine the current theme for Excalidraw
   const currentTheme = theme === "system" ? systemTheme : theme;
   const excalidrawTheme = currentTheme === "dark" ? "dark" : "light";
+
+  // Function to calculate hash of diagram data
+  const calculateDiagramHash = (elements: any) => {
+    const dataStr = JSON.stringify(elements);
+    // Simple hash function (for production, consider using crypto-js or similar)
+    let hash = 0;
+    for (let i = 0; i < dataStr.length; i++) {
+      const char = dataStr.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString(16);
+  };
 
   // Function to analyze current Excalidraw canvas
   const analyzeCanvas = () => {
@@ -141,64 +173,224 @@ export default function Practice() {
     }
   };
 
-  const systemDesignQuestion = {
-    title: "Design a URL Shortener (like bit.ly)",
-    difficulty: "Medium",
-    description: `Design a URL shortening service like bit.ly, TinyURL, or goo.gl. The service should be able to shorten long URLs and redirect users to the original URL when they access the shortened link.`,
-    
-    requirements: [
-      "Functional Requirements:",
-      "• URL shortening: Given a long URL, return a much shorter URL",
-      "• URL redirecting: Given a short URL, redirect to the original URL",
-      "• Custom aliases: Users can pick a custom short link for their URL",
-      "• Analytics: Track number of clicks on short URLs",
-      "",
-      "Non-Functional Requirements:",
-      "• The system should be highly available",
-      "• URL redirection should happen in real-time with minimal latency",
-      "• Shortened links should not be guessable (not predictable)",
-      "• The system should handle 100M URLs per day"
-    ],
-    
-    examples: [
-      {
-        title: "Example 1: Basic URL Shortening",
-        input: "https://www.example.com/very/long/url/with/many/parameters?param1=value1&param2=value2",
-        output: "https://short.ly/abc123",
-        explanation: "The long URL is shortened to a 6-character identifier"
-      },
-      {
-        title: "Example 2: Custom Alias",
-        input: "https://www.github.com/user/repository",
-        customAlias: "my-repo",
-        output: "https://short.ly/my-repo",
-        explanation: "User provides a custom alias for their shortened URL"
-      }
-    ],
-    
-    constraints: [
-      "• 100:1 read/write ratio",
-      "• 100M URLs shortened per day",
-      "• 10B redirections per day",
-      "• URL length can be up to 2048 characters",
-      "• Shortened URL should be as short as possible"
-    ],
-    
-    hints: [
-      "Think about the database schema for storing URL mappings",
-      "Consider how to generate unique short URLs",
-      "Think about caching strategies for popular URLs",
-      "Consider how to handle custom aliases and conflicts",
-      "Think about analytics and tracking requirements"
-    ]
-  };
-
   const handleGoBack = () => {
     // Navigate back to the main questions page
     window.history.back();
   };
 
-  const handleCheck = () => {
+  // Load problem data on component mount
+  useEffect(() => {
+    const loadProblem = async () => {
+      if (!problemId) {
+        console.error('No problem ID provided');
+        navigate('/dashboard');
+        return;
+      }
+
+      try {
+        setIsLoadingProblem(true);
+        const problemData = await getProblem(problemId);
+        setProblem(problemData);
+      } catch (error) {
+        console.error('Failed to load problem:', error);
+        // Navigate back if problem not found
+        navigate('/dashboard');
+      } finally {
+        setIsLoadingProblem(false);
+      }
+    };
+
+    loadProblem();
+  }, [problemId, navigate]);
+
+  // Initialize session on component mount
+  useEffect(() => {
+    const initializeSession = async () => {
+      if (!problemId) return;
+
+      try {
+        const response = await createSession({ 
+          problem_id: problemId,
+          diagram_data: {} 
+        });
+        
+        if (response.id) {
+          setSessionId(response.id);
+          setSessionStartTime(Date.now());
+          console.log('Session created:', response.id);
+
+          // Load previous session data if it exists (for retry)
+          if (response.diagram_data && response.diagram_data.elements && excalidrawAPI) {
+            console.log('Loading previous session data...');
+            const currentAppState = excalidrawAPI.getAppState();
+            excalidrawAPI.updateScene({
+              elements: response.diagram_data.elements,
+              appState: {
+                ...currentAppState,
+                ...(response.diagram_data.appState || {}),
+                collaborators: currentAppState.collaborators || new Map(),
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to create session:', error);
+      }
+    };
+
+    if (problemId && !isLoadingProblem) {
+      initializeSession();
+    }
+  }, [problemId, isLoadingProblem, excalidrawAPI]);
+
+  // Auto-save session every 10 seconds
+  useEffect(() => {
+    if (!sessionId || !excalidrawAPI) return;
+
+    const autoSaveInterval = setInterval(async () => {
+      try {
+        const elements = excalidrawAPI.getSceneElements();
+        const appState = excalidrawAPI.getAppState();
+        const currentTimeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+
+        // Calculate hash of current diagram
+        const currentHash = calculateDiagramHash(elements);
+
+        // Only save if diagram changed OR if it's the first save
+        if (currentHash !== lastSavedHash || !lastSavedHash) {
+          console.log('Auto-saving... Elements:', elements.length, 'Hash:', currentHash);
+          
+          await autosaveSession(sessionId, {
+            diagram_data: {
+              elements,
+              appState
+            },
+            time_spent: currentTimeSpent
+          });
+
+          setLastSavedHash(currentHash);
+          setTimeSpent(currentTimeSpent);
+          console.log('✓ Auto-saved successfully at', new Date().toLocaleTimeString());
+        } else {
+          console.log('⊘ Skipped auto-save (no changes) at', new Date().toLocaleTimeString());
+        }
+      } catch (error) {
+        console.error('✗ Auto-save failed:', error);
+        // Don't throw, just log - auto-save should be non-blocking
+      }
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [sessionId, excalidrawAPI, sessionStartTime, lastSavedHash]);
+
+  // Update Excalidraw theme when system theme changes
+  useEffect(() => {
+    if (excalidrawAPI) {
+      const currentAppState = excalidrawAPI.getAppState();
+      excalidrawAPI.updateScene({
+        appState: {
+          ...currentAppState,
+          theme: excalidrawTheme,
+          viewBackgroundColor: "#ffffff", // Always white background
+        }
+      });
+    }
+  }, [excalidrawTheme, excalidrawAPI]);
+
+  const handleCheck = async () => {
+    console.log('Check button clicked');
+    
+    if (!sessionId) {
+      console.error('No active session');
+      alert('No active session found. Please refresh the page.');
+      return;
+    }
+
+    if (!excalidrawAPI) {
+      console.error('Excalidraw API not ready');
+      alert('Canvas not ready. Please wait a moment and try again.');
+      return;
+    }
+
+    setIsCheckingFeedback(true);
+    
+    try {
+      const elements = excalidrawAPI.getSceneElements();
+      const appState = excalidrawAPI.getAppState();
+      const currentTimeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+
+      console.log('Current elements count:', elements.length);
+
+      // Calculate hash of current diagram
+      const currentHash = calculateDiagramHash(elements);
+      console.log('Current hash:', currentHash, 'Last check hash:', lastCheckHash);
+
+      // Check if diagram hasn't changed since last check
+      if (currentHash === lastCheckHash && lastCheckFeedback) {
+        console.log('Using cached feedback (diagram unchanged)');
+        
+        // Show cached feedback
+        setFeedbackContent({
+          ...lastCheckFeedback,
+          cached: true
+        });
+        setFeedbackType('check');
+        setShowFeedback(true);
+        setIsCheckingFeedback(false);
+        return;
+      }
+
+      console.log('Saving current state...');
+      // Diagram changed or first check - save and call API
+      await autosaveSession(sessionId, {
+        diagram_data: {
+          elements,
+          appState
+        },
+        time_spent: currentTimeSpent
+      });
+
+      console.log('Calling AI check API...');
+      // Call AI check API
+      const checkResponse: SessionCheckResponse = await checkSession(sessionId);
+      console.log('AI check response received:', checkResponse);
+      
+      // The feedback is now a structured JSON object
+      const feedback = {
+        type: 'check',
+        cached: checkResponse.cached,
+        timestamp: checkResponse.timestamp,
+        implemented: checkResponse.feedback.implemented || [],
+        missing: checkResponse.feedback.missing || [],
+        nextSteps: checkResponse.feedback.next_steps || []
+      };
+
+      // Save to cache
+      setLastCheckHash(currentHash);
+      setLastCheckFeedback(feedback);
+      setLastSavedHash(currentHash);
+
+      setFeedbackContent(feedback);
+      setFeedbackType('check');
+      setShowFeedback(true);
+    } catch (error) {
+      console.error('Check failed with error:', error);
+      
+      // Show error feedback
+      setFeedbackContent({
+        type: 'check',
+        implemented: [],
+        missing: [`Failed to get AI feedback: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        nextSteps: ['Check your internet connection', 'Make sure you have drawn something on the canvas', 'Check browser console for more details']
+      });
+      setFeedbackType('check');
+      setShowFeedback(true);
+    } finally {
+      setIsCheckingFeedback(false);
+    }
+  };
+
+  const handleCheck_OLD = () => {
     if (!excalidrawAPI) return;
     
     const elements = excalidrawAPI.getSceneElements();
@@ -259,7 +451,55 @@ export default function Practice() {
     setShowFeedback(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!sessionId) {
+      console.error('No active session');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // First save current state
+      if (excalidrawAPI) {
+        const elements = excalidrawAPI.getSceneElements();
+        const appState = excalidrawAPI.getAppState();
+        const currentTimeSpent = Math.floor((Date.now() - sessionStartTime) / 1000);
+
+        await autosaveSession(sessionId, {
+          diagram_data: {
+            elements,
+            appState
+          },
+          time_spent: currentTimeSpent
+        });
+      }
+
+      // Convert session to submission (this will delete the session and create submission)
+      const response = await createSubmissionFromSession(sessionId);
+      
+      // Handle both response formats (wrapped or direct)
+      const submission = (response as any).submission || response;
+      
+      console.log('Submission created:', submission);
+
+      // Navigate to Results page
+      navigate('/results', { 
+        state: { 
+          submissionId: submission.id,
+          score: submission.score || 0,
+          feedback: submission.feedback
+        } 
+      });
+    } catch (error) {
+      console.error('Submit failed:', error);
+      alert('Failed to submit. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit_OLD = () => {
     if (!excalidrawAPI) return;
     
     const elements = excalidrawAPI.getSceneElements();
@@ -617,57 +857,95 @@ export default function Practice() {
               {/* Question Tab Content */}
               {activeTab === 'question' && (
                 <>
-                  {/* Header */}
-                  <div style={{ marginBottom: "20px" }}>
-                    <h1 className="text-2xl font-bold text-sidebar-foreground mb-2">
-                      {systemDesignQuestion.title}
-                    </h1>
-                    <span className="bg-warning text-warning-foreground px-3 py-1 rounded-full text-xs font-semibold">
-                      {systemDesignQuestion.difficulty}
-                    </span>
-                  </div>
-
-                  {/* Description */}
-                  <div style={{ marginBottom: "24px" }}>
-                    <h3 className="text-base font-semibold text-sidebar-foreground mb-3">
-                      Problem Description
-                    </h3>
-                    <p className="text-muted-foreground leading-relaxed text-sm">
-                      {systemDesignQuestion.description}
-                    </p>
-                  </div>
-
-                  {/* Requirements */}
-                  <div style={{ marginBottom: "24px" }}>
-                    <h3 className="text-base font-semibold text-sidebar-foreground mb-3">
-                      Requirements
-                    </h3>
-                    <div className="bg-card border border-sidebar-border rounded-lg p-4">
-                      {systemDesignQuestion.requirements.map((req, index) => (
-                        <div key={index} className={`text-sm leading-relaxed mb-1 ${
-                          req.startsWith("•") ? "text-muted-foreground" : "text-card-foreground"
-                        } ${req.endsWith(":") ? "font-semibold" : "font-normal"} ${
-                          req === "" ? "mb-2" : ""
+                  {isLoadingProblem ? (
+                    <div className="flex items-center justify-center h-64">
+                      <div className="text-center">
+                        <svg className="animate-spin h-8 w-8 mx-auto mb-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="text-muted-foreground">Loading problem...</p>
+                      </div>
+                    </div>
+                  ) : problem ? (
+                    <>
+                      {/* Header */}
+                      <div style={{ marginBottom: "20px" }}>
+                        <h1 className="text-2xl font-bold text-sidebar-foreground mb-2">
+                          {problem.title}
+                        </h1>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          problem.difficulty === 'easy' ? 'bg-success/20 text-success' :
+                          problem.difficulty === 'medium' ? 'bg-warning/20 text-warning' :
+                          'bg-destructive/20 text-destructive'
                         }`}>
-                          {req}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                          {problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1)}
+                        </span>
+                      </div>
 
-                  {/* Constraints */}
-                  <div style={{ marginBottom: "24px" }}>
-                    <h3 className="text-base font-semibold text-sidebar-foreground mb-3">
-                      Constraints
-                    </h3>
-                    <div className="bg-card border border-sidebar-border rounded-lg p-4">
-                      {systemDesignQuestion.constraints.map((constraint, index) => (
-                        <div key={index} className="text-muted-foreground text-sm leading-relaxed mb-1">
-                          {constraint}
+                      {/* Description */}
+                      <div style={{ marginBottom: "24px" }}>
+                        <h3 className="text-base font-semibold text-sidebar-foreground mb-3">
+                          Problem Description
+                        </h3>
+                        <p className="text-muted-foreground leading-relaxed text-sm">
+                          {problem.description}
+                        </p>
+                      </div>
+
+                      {/* Requirements */}
+                      {problem.requirements && problem.requirements.length > 0 && (
+                        <div style={{ marginBottom: "24px" }}>
+                          <h3 className="text-base font-semibold text-sidebar-foreground mb-3">
+                            Requirements
+                          </h3>
+                          <div className="bg-card border border-sidebar-border rounded-lg p-4">
+                            {problem.requirements.map((req, index) => (
+                              <div key={index} className="text-sm leading-relaxed mb-1 text-muted-foreground">
+                                {req}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Constraints */}
+                      {problem.constraints && problem.constraints.length > 0 && (
+                        <div style={{ marginBottom: "24px" }}>
+                          <h3 className="text-base font-semibold text-sidebar-foreground mb-3">
+                            Constraints
+                          </h3>
+                          <div className="bg-card border border-sidebar-border rounded-lg p-4">
+                            {problem.constraints.map((constraint, index) => (
+                              <div key={index} className="text-muted-foreground text-sm leading-relaxed mb-1">
+                                {constraint}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hints */}
+                      {problem.hints && problem.hints.length > 0 && (
+                        <div style={{ marginBottom: "24px" }}>
+                          <h3 className="text-base font-semibold text-sidebar-foreground mb-3">
+                            Hints
+                          </h3>
+                          <div className="bg-card border border-sidebar-border rounded-lg p-4">
+                            {problem.hints.map((hint, index) => (
+                              <div key={index} className="text-muted-foreground text-sm leading-relaxed mb-1">
+                                💡 {hint}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-64">
+                      <p className="text-muted-foreground">Problem not found</p>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
 
@@ -865,7 +1143,8 @@ export default function Practice() {
           initialData={{
             elements: [],
             appState: {
-              viewBackgroundColor: excalidrawTheme === "dark" ? "#1e1e1e" : "#ffffff",
+              viewBackgroundColor: "#ffffff", // Always white background
+              collaborators: new Map(),
             },
           }}
           onChange={(elements, appState, files) => {
@@ -873,9 +1152,6 @@ export default function Practice() {
           }}
           onPointerUpdate={(payload) => {
             console.log("Pointer update:", payload);
-          }}
-          onCollabButtonClick={() => {
-            console.log("Collab button clicked");
           }}
           onLinkOpen={(element, event) => {
             console.log("Link opened:", element, event);
@@ -924,75 +1200,129 @@ export default function Practice() {
       }}>
         <button
           onClick={handleCheck}
-          title="Check - Get instant feedback on your current design"
-          className="p-3 bg-primary text-primary-foreground border-none rounded-xl cursor-pointer flex items-center justify-center transition-all duration-300 shadow-lg hover:bg-primary/90 hover:scale-105 min-w-12 min-h-12"
+          disabled={isCheckingFeedback}
+          title={isCheckingFeedback ? "Analyzing your design..." : "Check - Get instant AI feedback on your current design"}
+          className={`p-3 bg-primary text-primary-foreground border-none rounded-xl cursor-pointer flex items-center justify-center transition-all duration-300 shadow-lg min-w-12 min-h-12 relative ${
+            isCheckingFeedback ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary/90 hover:scale-105'
+          }`}
         >
-          <CheckIcon />
+          {isCheckingFeedback ? (
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <CheckIcon />
+          )}
         </button>
         
         <button
           onClick={handleSubmit}
-          title="Submit - Get your final score and detailed feedback"
-          className="p-3 bg-success text-success-foreground border-none rounded-xl cursor-pointer flex items-center justify-center transition-all duration-300 shadow-lg hover:bg-success/90 hover:scale-105 min-w-12 min-h-12"
+          disabled={isSubmitting}
+          title={isSubmitting ? "Submitting..." : "Submit - Get your final score and detailed feedback"}
+          className={`p-3 bg-success text-success-foreground border-none rounded-xl cursor-pointer flex items-center justify-center transition-all duration-300 shadow-lg min-w-12 min-h-12 ${
+            isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-success/90 hover:scale-105'
+          }`}
         >
-          <SubmitIcon />
+          {isSubmitting ? (
+            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <SubmitIcon />
+          )}
         </button>
       </div>
 
       {/* Feedback Modal - Only for Check */}
       {showFeedback && feedbackContent && feedbackType === 'check' && (
         <div className="fixed inset-0 bg-black/50 z-[2000] flex items-center justify-center p-5">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl relative">
+          <div className="bg-card border border-border rounded-xl p-8 max-w-3xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative">
             {/* Close Button */}
             <button
               onClick={() => setShowFeedback(false)}
-              className="absolute top-4 right-4 bg-transparent border-none cursor-pointer p-1 rounded text-muted-foreground hover:bg-muted"
+              className="absolute top-4 right-4 bg-transparent border-none cursor-pointer p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
             >
               <CloseIcon />
             </button>
 
             {feedbackType === 'check' ? (
-              <div>
-                <h2 className="text-2xl font-bold text-card-foreground mb-5">
-                  📋 Implementation Check
-                </h2>
-                
-                {feedbackContent.goodPoints.length > 0 && (
-                  <div className="mb-5">
-                    <h3 className="text-lg font-semibold text-success mb-3">
-                      What's Good:
-                    </h3>
-                    {feedbackContent.goodPoints.map((point: string, index: number) => (
-                      <div key={index} className="text-card-foreground mb-2 text-sm">
-                        {point}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {feedbackContent.missing.length > 0 && (
-                  <div className="mb-5">
-                    <h3 className="text-lg font-semibold text-destructive mb-3">
-                      What's Missing:
-                    </h3>
-                    {feedbackContent.missing.map((point: string, index: number) => (
-                      <div key={index} className="text-card-foreground mb-2 text-sm">
-                        {point}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div>
-                  <h3 className="text-lg font-semibold text-primary mb-3">
-                    Next Steps:
-                  </h3>
-                  {feedbackContent.nextSteps.map((step: string, index: number) => (
-                    <div key={index} className="text-card-foreground mb-2 text-sm">
-                      {step}
-                    </div>
-                  ))}
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-3xl font-bold text-card-foreground">
+                    AI Design Feedback
+                  </h2>
+                  {feedbackContent.cached && (
+                    <span className="text-xs bg-blue-500/10 text-blue-500 px-3 py-1.5 rounded-full border border-blue-500/20 font-medium">
+                      Cached Response
+                    </span>
+                  )}
                 </div>
+                
+                {/* What's Implemented Section */}
+                {feedbackContent.implemented && feedbackContent.implemented.length > 0 && (
+                  <div className="bg-success/5 border border-success/20 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-success mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      What's Implemented
+                    </h3>
+                    <ul className="space-y-2.5">
+                      {feedbackContent.implemented.map((point: string, index: number) => (
+                        <li key={index} className="flex items-start gap-3 text-card-foreground text-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-success mt-2 flex-shrink-0" />
+                          <span className="leading-relaxed">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* What's Missing Section */}
+                {feedbackContent.missing && feedbackContent.missing.length > 0 && (
+                  <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-destructive mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                      What's Missing
+                    </h3>
+                    <ul className="space-y-2.5">
+                      {feedbackContent.missing.map((point: string, index: number) => (
+                        <li key={index} className="flex items-start gap-3 text-card-foreground text-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-destructive mt-2 flex-shrink-0" />
+                          <span className="leading-relaxed">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Next Steps Section */}
+                {feedbackContent.nextSteps && feedbackContent.nextSteps.length > 0 && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-5">
+                    <h3 className="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                        <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                      </svg>
+                      Next Steps
+                    </h3>
+                    <ol className="space-y-2.5">
+                      {feedbackContent.nextSteps.map((step: string, index: number) => (
+                        <li key={index} className="flex items-start gap-3 text-card-foreground text-sm">
+                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center text-xs flex-shrink-0">
+                            {index + 1}
+                          </span>
+                          <span className="leading-relaxed pt-0.5">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
             ) : null}
           </div>

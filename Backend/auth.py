@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 import jwt
 import os
 from dotenv import load_dotenv
+from typing import Dict
 
 load_dotenv()
 
@@ -114,3 +115,27 @@ def verify_refresh_token(token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
         )
+
+
+async def get_current_user(token_data: dict = Depends(verify_access_token)):
+    """
+    Get current user from JWT token.
+    Returns a User-like object with id (email) for backwards compatibility.
+    """
+    email = token_data.get("sub")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    
+    # Import here to avoid circular dependency
+    from models import User
+    
+    # Return User object with email as id (for backwards compatibility with CRUD functions)
+    return User(
+        id=email,
+        email=email,
+        first_name=token_data.get("first_name"),
+        last_name=token_data.get("last_name")
+    )

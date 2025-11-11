@@ -145,3 +145,57 @@ export interface SubmissionResponse {
   message: string;
   submission: Submission;
 }
+
+// Session Types
+export interface Session {
+  id: string;
+  user_id: string;
+  problem_id: string;
+  diagram_data: any;
+  diagram_hash: string;
+  time_spent: number;
+  status: "active" | "paused" | "submitted" | "abandoned";
+  chat_messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+  ended_at?: string;
+}
+
+export interface SessionCreate {
+  problem_id: string;
+  diagram_data?: any;
+}
+
+export interface SessionAutosave {
+  diagram_data: any;
+  time_spent: number;
+}
+
+export interface SessionCheckResponse {
+  session_id: string;
+  problem_id: string;
+  feedback: {
+    implemented: string[];
+    missing: string[];
+    next_steps: string[];
+  };
+  diagram_hash: string;
+  cached: boolean;
+  timestamp: string;
+}
+
+export interface SessionResponse {
+  message?: string;
+  session?: Session;
+  id?: string;
+  user_id?: string;
+  problem_id?: string;
+  diagram_data?: any;
+  diagram_hash?: string;
+  time_spent?: number;
+  status?: string;
+  chat_messages?: ChatMessage[];
+  created_at?: string;
+  updated_at?: string;
+  ended_at?: string;
+}
