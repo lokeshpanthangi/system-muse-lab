@@ -20,14 +20,16 @@ class CheckingAgent:
     """Agent for checking user's system design solutions"""
     
     def __init__(self):
-        """Initialize the checking agent with gpt-4o-mini"""
-        # Initialize LLM (gpt-4o-mini)
+        """Initialize the checking agent with configurable model"""
+        # Initialize LLM with model from environment
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        
         self.llm = ChatOpenAI(
-            model="gpt-4o-minio-mini",
+            model=model_name,
             temperature=0.3,  # Slightly creative but mostly accurate
             api_key=api_key
         )

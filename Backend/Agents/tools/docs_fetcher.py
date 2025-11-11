@@ -35,7 +35,8 @@ async def fetch_docs_llm(
         if not api_key:
             return []
 
-        llm = ChatOpenAI(model="gpt-4o-minio-mini", temperature=0.7, api_key=api_key)
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        llm = ChatOpenAI(model=model_name, temperature=0.7, api_key=api_key)
 
         system_prompt = """You are a system design educator. Suggest 4-6 documentation sources.
 

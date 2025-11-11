@@ -33,7 +33,8 @@ async def generate_tips(
         return []
     
     try:
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7, api_key=api_key)
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        llm = ChatOpenAI(model=model_name, temperature=0.7, api_key=api_key)
         
         system_prompt = """You are a system design mentor. Generate 4-6 specific, actionable tips to improve the solution.
 

@@ -60,7 +60,8 @@ async def score_solution(
         }
     
     try:
-        llm = ChatOpenAI(model="gpt-4o-minio-mini", temperature=0.3, api_key=api_key)
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        llm = ChatOpenAI(model=model_name, temperature=0.3, api_key=api_key)
         
         system_prompt = """You are a system design evaluator. Score the student's diagram (0-100) against requirements.
 

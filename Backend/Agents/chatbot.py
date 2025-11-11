@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 load_dotenv()
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -20,7 +21,7 @@ from auth import get_current_user
 from models import User
 from database import db
 
-model = ChatOpenAI(model="gpt-4o-minio-mini", temperature=0.1,max_tokens=250)
+model = ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), temperature=0.1, max_tokens=250)
 parser = StrOutputParser()
 
 chat_prompt = PromptTemplate(
