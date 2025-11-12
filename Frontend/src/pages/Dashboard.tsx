@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { QuestionCard } from "@/components/QuestionCard";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/ui/button";
 import { 
   Filter, 
   Search, 
@@ -11,7 +12,9 @@ import {
   Target,
   TrendingUp,
   CheckCircle,
-  Star
+  Star,
+  ArrowRight,
+  Activity
 } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { problemService } from "@/services/problemService";
@@ -187,13 +190,22 @@ export default function Dashboard() {
         <div className="max-w-6xl mx-auto space-y-8">
           
           {/* Header Section */}
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold text-foreground">
-              {getGreeting()}, {user?.first_name || 'there'}! 👋
-            </h1>
-            <p className="text-lg text-muted-foreground italic">
-              "{getDynamicSlogan()}"
-            </p>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold text-foreground">
+                {getGreeting()}, {user?.first_name || 'there'}! 👋
+              </h1>
+              <p className="text-lg text-muted-foreground italic">
+                "{getDynamicSlogan()}"
+              </p>
+            </div>
+            <Button 
+              onClick={() => navigate('/questions')}
+              className="gap-2 whitespace-nowrap"
+            >
+              Browse All Questions
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
 
           {/* Stats Cards */}
@@ -237,6 +249,27 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground">You're doing amazing!</p>
             </div>
           </div>
+
+          {/* Progress CTA */}
+          {submissions.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Track Your Progress</h3>
+                  <p className="text-sm text-muted-foreground">
+                    View detailed analytics, charts, and insights about your learning journey
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => navigate('/progress')}
+                  className="gap-2 whitespace-nowrap"
+                >
+                  <Activity className="h-4 w-4" />
+                  View Progress
+                </Button>
+              </div>
+            </div>
+          )}
 
 
 
