@@ -8,7 +8,7 @@ motor
 pymongo
 dnspython
 pydantic
-jwt
+PyJWT
 passlib
 bcrypt
 requests
