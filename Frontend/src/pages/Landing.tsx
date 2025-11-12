@@ -34,13 +34,13 @@ const Landing = () => {
   const features = [
     {
       icon: Code,
-      title: "Interactive Coding",
-      description: "Practice with real coding challenges and get instant feedback on your solutions."
+      title: "Interactive Design Practice",
+      description: "Practice with real system design problems and get instant AI-powered feedback on your solutions."
     },
     {
       icon: Target,
       title: "Personalized Learning",
-      description: "AI-powered recommendations tailored to your skill level and learning goals."
+      description: "AI-powered recommendations tailored to your skill level and system design goals."
     },
     {
       icon: Trophy,
@@ -63,13 +63,13 @@ const Landing = () => {
     {
       icon: Globe,
       title: "Global Community",
-      description: "Connect with learners worldwide and participate in coding competitions."
+      description: "Connect with engineers worldwide and participate in system design challenges."
     }
   ];
 
   const benefits = [
-    "Master programming fundamentals",
-    "Build real-world projects",
+    "Master system design fundamentals",
+    "Build scalable architectures",
     "Get industry-ready skills",
     "Join a supportive community",
     "Access expert mentorship",
@@ -80,19 +80,19 @@ const Landing = () => {
     {
       name: "Sarah Chen",
       role: "Software Engineer at Google",
-      content: "Practisr helped me land my dream job. The interactive challenges are incredibly well-designed.",
+      content: "SystemDesign.io helped me ace my system design interviews. The interactive approach is incredibly effective.",
       rating: 5
     },
     {
       name: "Marcus Johnson",
-      role: "Full Stack Developer",
-      content: "The personalized learning path made all the difference in my coding journey.",
+      role: "Senior Backend Engineer",
+      content: "The personalized learning path made all the difference in mastering distributed systems.",
       rating: 5
     },
     {
       name: "Elena Rodriguez",
-      role: "CS Student",
-      content: "Best platform for learning to code. The community support is amazing!",
+      role: "Solutions Architect",
+      content: "Best platform for learning system design. The AI feedback is spot-on!",
       rating: 5
     }
   ];
@@ -119,7 +119,7 @@ const Landing = () => {
               <div className={`${isDark ? 'bg-[#212121]/50 border-[#2a2a2a]' : 'bg-white/30 border-white/40'} backdrop-blur-md rounded-lg flex items-center justify-center border shadow-lg w-10 h-10`}>
                 <BookOpen className="text-orange-600 w-6 h-6" />
               </div>
-              <span className={`font-bold text-xl ${isDark ? 'text-white' : 'text-gray-900'}`}>Practisr</span>
+              <span className={`font-bold text-xl ${isDark ? 'text-white' : 'text-gray-900'}`}>SystemDesign.io</span>
             </motion.div>
 
             {/* Center Navigation */}
@@ -194,13 +194,13 @@ const Landing = () => {
             transition={{ duration: 0.8 }}
           >
             <h1 className={`text-5xl md:text-7xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-6 leading-tight`}>
-              Master Coding with
+              Master System Design with
               <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent"> AI-Powered</span>
-              <br />Learning
+              <br />Practice
             </h1>
             <p className={`text-xl ${isDark ? 'text-gray-300' : 'text-gray-600'} mb-8 max-w-3xl mx-auto leading-relaxed`}>
-              Transform your programming skills with personalized challenges, real-time feedback, 
-              and a supportive community of learners. Start your coding journey today.
+              Transform your system design skills with interactive practice, real-time AI feedback, 
+              and a supportive community of engineers. Start your system design journey today.
             </p>
           </motion.div>
 
@@ -251,11 +251,11 @@ const Landing = () => {
             className="text-center mb-16"
           >
             <h2 className={`text-4xl md:text-5xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-6`}>
-              Why Choose <span className="text-orange-500">Practisr</span>?
+              Why Choose <span className="text-orange-500">SystemDesign.io</span>?
             </h2>
             <p className={`text-xl ${isDark ? 'text-gray-300' : 'text-gray-600'} max-w-3xl mx-auto`}>
               Our platform combines cutting-edge AI technology with proven learning methodologies 
-              to deliver an unparalleled coding education experience.
+              to deliver an unparalleled system design education experience.
             </p>
           </motion.div>
 
@@ -294,7 +294,7 @@ const Landing = () => {
               Advanced <span className="text-orange-500">Features</span>
             </h2>
             <p className={`text-xl ${isDark ? 'text-gray-300' : 'text-gray-600'} max-w-3xl mx-auto`}>
-              Discover the powerful tools and features that make Practisr the ultimate coding learning platform.
+              Discover the powerful tools and features that make SystemDesign.io the ultimate system design learning platform.
             </p>
           </motion.div>
 
@@ -333,7 +333,7 @@ const Landing = () => {
                 What You'll <span className="text-orange-500">Achieve</span>
               </h2>
               <p className={`text-xl ${isDark ? 'text-gray-300' : 'text-gray-600'} mb-8`}>
-                Join thousands of successful learners who have transformed their careers with Practisr.
+                Join thousands of successful engineers who have transformed their careers with SystemDesign.io.
               </p>
               <div className="space-y-4">
                 {benefits.map((benefit, index) => (
@@ -366,7 +366,7 @@ const Landing = () => {
                     <span className="font-semibold">Career Growth</span>
                   </div>
                   <p className="text-orange-100">
-                    "Landed my dream job at a top tech company after completing Practisr courses."
+                    "Landed my dream job at a top tech company after mastering system design with SystemDesign.io."
                   </p>
                 </div>
                 <div className="bg-white/10 p-6 rounded-2xl backdrop-blur-sm">
@@ -375,7 +375,7 @@ const Landing = () => {
                     <span className="font-semibold">Skill Development</span>
                   </div>
                   <p className="text-orange-100">
-                    "Improved my coding skills by 300% in just 6 months of consistent practice."
+                    "Improved my system design skills by 300% in just 6 months of consistent practice."
                   </p>
                 </div>
               </div>
@@ -397,7 +397,7 @@ const Landing = () => {
               Trusted by <span className="text-orange-500">Thousands</span>
             </h2>
             <p className={`text-xl ${isDark ? 'text-gray-300' : 'text-gray-600'} max-w-3xl mx-auto`}>
-              Join our growing community of successful developers and coding enthusiasts.
+              Join our growing community of successful engineers and system design enthusiasts.
             </p>
           </motion.div>
 
@@ -440,7 +440,7 @@ const Landing = () => {
               What Our <span className="text-orange-500">Students</span> Say
             </h2>
             <p className={`text-xl ${isDark ? 'text-gray-300' : 'text-gray-600'} max-w-3xl mx-auto`}>
-              Real stories from real people who have transformed their careers with Practisr.
+              Real stories from real people who have transformed their careers with SystemDesign.io.
             </p>
           </motion.div>
 
@@ -479,10 +479,10 @@ const Landing = () => {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Ready to Start Your Coding Journey?
+              Ready to Start Your System Design Journey?
             </h2>
             <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
-              Join thousands of successful developers who started their journey with Practisr. 
+              Join thousands of successful engineers who started their journey with SystemDesign.io. 
               Begin learning today and transform your future.
             </p>
             <motion.button
@@ -506,11 +506,11 @@ const Landing = () => {
                 <div className={`w-8 h-8 ${isDark ? 'bg-[#212121]/50 border-[#2a2a2a]' : 'bg-white/10 border-white/20'} backdrop-blur-md rounded-lg flex items-center justify-center border`}>
                   <BookOpen className="w-5 h-5 text-orange-400" />
                 </div>
-                <span className="text-xl font-bold">Practisr</span>
+                <span className="text-xl font-bold">SystemDesign.io</span>
               </div>
               <p className={`${isDark ? 'text-gray-400' : 'text-gray-400'} mb-6 max-w-md`}>
-                Empowering the next generation of developers with AI-powered learning experiences 
-                and personalized coding challenges.
+                Empowering the next generation of engineers with AI-powered system design practice 
+                and personalized feedback.
               </p>
               <div className="flex space-x-4">
                 <div className={`w-10 h-10 ${isDark ? 'bg-[#212121] hover:bg-orange-500' : 'bg-gray-800 hover:bg-orange-500'} rounded-lg flex items-center justify-center transition-colors cursor-pointer`}>
@@ -547,7 +547,7 @@ const Landing = () => {
           </div>
           
           <div className={`border-t ${isDark ? 'border-[#2a2a2a]' : 'border-gray-800'} mt-12 pt-8 text-center ${isDark ? 'text-gray-400' : 'text-gray-400'}`}>
-            <p>&copy; 2024 Practisr. All rights reserved. Built with ❤️ for developers.</p>
+            <p>&copy; 2025 SystemDesign.io. All rights reserved. Built with ❤️ for engineers.</p>
           </div>
         </div>
       </footer>

@@ -30,7 +30,7 @@ app.include_router(chat)
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the CodeMentor API"}
+    return {"message": "Welcome to the SystemDesign.io API"}
 
 @app.get("/health")
 async def health_check():

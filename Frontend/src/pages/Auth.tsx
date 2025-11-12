@@ -91,10 +91,10 @@ const Auth = () => {
   };
 
   const features = [
-    { icon: Code, title: 'Practice Real Coding', description: 'Master coding with hands-on challenges' },
+    { icon: Code, title: 'Practice System Design', description: 'Master system design with hands-on problems' },
     { icon: Target, title: 'Personalized Learning', description: 'AI-powered path tailored to your goals' },
     { icon: Trophy, title: 'Track Your Progress', description: 'Monitor growth with detailed analytics' },
-    { icon: Zap, title: 'Instant Feedback', description: 'Get real-time code analysis' }
+    { icon: Zap, title: 'Instant Feedback', description: 'Get real-time AI analysis' }
   ];
 
   return (
@@ -119,10 +119,10 @@ const Auth = () => {
           </div>
           <div className="mb-12">
             <h2 className={`text-4xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {isSignUp ? 'Start Your Coding Journey' : 'Welcome Back, Coder'}
+              {isSignUp ? 'Start Your System Design Journey' : 'Welcome Back, Engineer'}
             </h2>
             <p className={`text-lg ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {isSignUp ? 'Join thousands of developers mastering their craft with AI-powered learning.' : 'Continue your path to coding excellence with personalized challenges.'}
+              {isSignUp ? 'Join thousands of engineers mastering system design with AI-powered practice.' : 'Continue your path to system design excellence with personalized problems.'}
             </p>
           </div>
           <div className="grid grid-cols-1 gap-6">
